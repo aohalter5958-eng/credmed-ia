@@ -11,20 +11,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import letter
 
 
-# =========================
-# OPENAI
-# =========================
-
 load_dotenv()
-
 api_key = os.getenv("OPENAI_API_KEY")
-
 client = OpenAI(api_key=api_key)
 
-
-# =========================
-# PDF
-# =========================
 
 def gerar_pdf(texto):
 
@@ -32,30 +22,88 @@ def gerar_pdf(texto):
 
     doc = SimpleDocTemplate(
         buffer,
-        pagesize=letter
+        pagesize=letter,
+        rightMargin=50,
+        leftMargin=50,
+        topMargin=50,
+        bottomMargin=40
     )
 
     styles = getSampleStyleSheet()
 
+    titulo_style = styles["Title"]
+    titulo_style.fontSize = 22
+    titulo_style.spaceAfter = 20
+
+    subtitulo_style = styles["Heading2"]
+    subtitulo_style.fontSize = 14
+    subtitulo_style.spaceAfter = 16
+
+    texto_style = styles["BodyText"]
+    texto_style.fontSize = 10
+    texto_style.leading = 14
+    texto_style.spaceAfter = 10
+
     elementos = []
 
-    titulo = Paragraph(
-        "<b>Relatório CredMed IA</b>",
-        styles["Title"]
+    elementos.append(
+        Paragraph("<b>CredMed IA</b>", titulo_style)
     )
 
-    elementos.append(titulo)
+    elementos.append(
+        Paragraph(
+            "Relatório Profissional de Análise de Credenciamento Médico",
+            subtitulo_style
+        )
+    )
+
+    elementos.append(
+        Paragraph(
+            "Documento gerado automaticamente pela plataforma CredMed IA.",
+            texto_style
+        )
+    )
 
     elementos.append(Spacer(1, 20))
 
-    texto_formatado = texto.replace("\n", "<br/>")
+    linhas = texto.split("\n")
 
-    paragrafo = Paragraph(
-        texto_formatado,
-        styles["BodyText"]
+    for linha in linhas:
+
+        linha = linha.strip()
+
+        if not linha:
+            elementos.append(Spacer(1, 8))
+            continue
+
+        if linha.startswith("# "):
+            elementos.append(
+                Paragraph(f"<b>{linha.replace('# ', '')}</b>", styles["Heading1"])
+            )
+
+        elif linha.startswith("## "):
+            elementos.append(
+                Paragraph(f"<b>{linha.replace('## ', '')}</b>", styles["Heading2"])
+            )
+
+        elif linha.startswith("- "):
+            elementos.append(
+                Paragraph(f"• {linha.replace('- ', '')}", texto_style)
+            )
+
+        else:
+            elementos.append(
+                Paragraph(linha, texto_style)
+            )
+
+    elementos.append(Spacer(1, 20))
+
+    elementos.append(
+        Paragraph(
+            "<i>CredMed IA • Análise inteligente de editais e credenciamentos médicos públicos.</i>",
+            texto_style
+        )
     )
-
-    elementos.append(paragrafo)
 
     doc.build(elementos)
 
@@ -66,10 +114,6 @@ def gerar_pdf(texto):
     return pdf
 
 
-# =========================
-# CONFIG STREAMLIT
-# =========================
-
 st.set_page_config(
     page_title="CredMed IA",
     page_icon="🏥",
@@ -77,20 +121,11 @@ st.set_page_config(
 )
 
 
-# =========================
-# CSS
-# =========================
-
 st.markdown("""
 <style>
 
 [data-testid="stAppViewContainer"] {
-    background: linear-gradient(
-        135deg,
-        #020617 0%,
-        #0f172a 45%,
-        #1e293b 100%
-    );
+    background: linear-gradient(135deg, #020617 0%, #0f172a 45%, #1e293b 100%);
 }
 
 [data-testid="stHeader"] {
@@ -104,118 +139,76 @@ st.markdown("""
 }
 
 .hero {
-    background: linear-gradient(
-        135deg,
-        rgba(14,165,233,0.18),
-        rgba(37,99,235,0.10)
-    );
-
+    background: linear-gradient(135deg, rgba(14,165,233,0.18), rgba(37,99,235,0.10));
     border: 1px solid rgba(148,163,184,0.22);
-
     border-radius: 30px;
-
     padding: 42px;
-
     margin-bottom: 30px;
-
     box-shadow: 0 25px 80px rgba(0,0,0,0.35);
 }
 
 .badge {
     display: inline-block;
-
     background: rgba(34,197,94,0.15);
-
     color: #86efac;
-
     border: 1px solid rgba(34,197,94,0.35);
-
     padding: 8px 16px;
-
     border-radius: 999px;
-
     font-size: 13px;
-
     font-weight: 700;
-
     margin-bottom: 20px;
 }
 
 .logo {
     font-size: 52px;
-
     font-weight: 900;
-
     color: white;
-
     letter-spacing: -2px;
 }
 
 .subtitle {
     color: #cbd5e1;
-
     font-size: 23px;
-
     margin-top: 10px;
-
     max-width: 900px;
 }
 
 .card {
     background: rgba(255,255,255,0.96);
-
     border-radius: 24px;
-
     padding: 28px;
-
     box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-
     margin-bottom: 20px;
-
     border: 1px solid rgba(226,232,240,0.9);
 }
 
 .card-dark {
     background: rgba(15,23,42,0.86);
-
     border-radius: 24px;
-
     padding: 28px;
-
     box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-
     border: 1px solid rgba(148,163,184,0.18);
-
     color: white;
 }
 
 .metric-title {
     color: #64748b;
-
     font-size: 14px;
-
     font-weight: 700;
-
     text-transform: uppercase;
 }
 
 .metric-number {
     color: #0f172a;
-
     font-size: 30px;
-
     font-weight: 900;
 }
 
 .feature {
     background: rgba(255,255,255,0.06);
-
     border-radius: 16px;
-
     padding: 14px 16px;
-
     margin-bottom: 12px;
-
     border: 1px solid rgba(148,163,184,0.16);
 }
 
@@ -229,31 +222,22 @@ st.markdown("""
 
 .upload-title {
     color: #0f172a;
-
     font-size: 24px;
-
     font-weight: 900;
-
     margin-bottom: 10px;
 }
 
 .upload-desc {
     color: #475569;
-
     font-size: 16px;
-
     line-height: 1.6;
 }
 
 .result-box {
     background: white;
-
     border-radius: 24px;
-
     padding: 34px;
-
     margin-top: 24px;
-
     box-shadow: 0 20px 60px rgba(0,0,0,0.25);
 }
 
@@ -265,57 +249,31 @@ st.markdown("""
 
 .footer {
     color: #94a3b8;
-
     text-align: center;
-
     margin-top: 35px;
-
     font-size: 14px;
 }
 
 .stButton button {
-    background: linear-gradient(
-        135deg,
-        #0284c7,
-        #2563eb
-    ) !important;
-
+    background: linear-gradient(135deg, #0284c7, #2563eb) !important;
     color: white !important;
-
     border: none !important;
-
     border-radius: 14px !important;
-
     height: 56px !important;
-
     font-size: 18px !important;
-
     font-weight: 800 !important;
-
     width: 100% !important;
-
     box-shadow: 0 16px 32px rgba(37,99,235,0.28);
 }
 
 .stDownloadButton button {
-    background: linear-gradient(
-        135deg,
-        #16a34a,
-        #15803d
-    ) !important;
-
+    background: linear-gradient(135deg, #16a34a, #15803d) !important;
     color: white !important;
-
     border: none !important;
-
     border-radius: 14px !important;
-
     height: 52px !important;
-
     font-size: 16px !important;
-
     font-weight: 800 !important;
-
     width: 100% !important;
 }
 
@@ -323,100 +281,47 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# =========================
-# HERO
-# =========================
-
 st.markdown("""
 <div class="hero">
-
-<div class="badge">
-MVP ONLINE • IA PARA SAÚDE PÚBLICA
-</div>
-
-<div class="logo">
-🏥 CredMed IA
-</div>
-
+<div class="badge">MVP ONLINE • IA PARA SAÚDE PÚBLICA</div>
+<div class="logo">🏥 CredMed IA</div>
 <div class="subtitle">
 Plataforma inteligente para análise de editais,
 chamamentos públicos e credenciamentos médicos.
 </div>
-
 </div>
 """, unsafe_allow_html=True)
 
 
-# =========================
-# MÉTRICAS
-# =========================
-
 m1, m2, m3 = st.columns(3)
 
 with m1:
-
     st.markdown("""
     <div class="card">
-
-    <div class="metric-title">
-    ANÁLISE
-    </div>
-
-    <div class="metric-number">
-    PDF
-    </div>
-
-    <p>
-    Leitura automática de editais médicos.
-    </p>
-
+    <div class="metric-title">ANÁLISE</div>
+    <div class="metric-number">PDF</div>
+    <p>Leitura automática de editais médicos.</p>
     </div>
     """, unsafe_allow_html=True)
 
 with m2:
-
     st.markdown("""
     <div class="card">
-
-    <div class="metric-title">
-    ENTREGA
-    </div>
-
-    <div class="metric-number">
-    Relatório
-    </div>
-
-    <p>
-    Resumo, riscos, prazos e documentos.
-    </p>
-
+    <div class="metric-title">ENTREGA</div>
+    <div class="metric-number">Relatório</div>
+    <p>Resumo, riscos, prazos e documentos.</p>
     </div>
     """, unsafe_allow_html=True)
 
 with m3:
-
     st.markdown("""
     <div class="card">
-
-    <div class="metric-title">
-    EXPORTAÇÃO
-    </div>
-
-    <div class="metric-number">
-    PDF/TXT
-    </div>
-
-    <p>
-    Baixe o resultado para salvar ou enviar.
-    </p>
-
+    <div class="metric-title">EXPORTAÇÃO</div>
+    <div class="metric-number">PDF/TXT</div>
+    <p>Baixe o resultado para salvar ou enviar.</p>
     </div>
     """, unsafe_allow_html=True)
 
-
-# =========================
-# LAYOUT PRINCIPAL
-# =========================
 
 col1, col2 = st.columns([1.4, 1])
 
@@ -424,18 +329,13 @@ with col1:
 
     st.markdown("""
     <div class="card">
-
-    <div class="upload-title">
-    Enviar edital para análise
-    </div>
-
+    <div class="upload-title">Enviar edital para análise</div>
     <div class="upload-desc">
     Faça upload de um edital em PDF.
     A IA irá identificar o objeto, requisitos,
     prazos, documentos exigidos, valores,
     riscos e próximos passos recomendados.
     </div>
-
     """, unsafe_allow_html=True)
 
     arquivo = st.file_uploader(
@@ -450,10 +350,7 @@ with col2:
 
     st.markdown("""
     <div class="card-dark">
-
-    <h2>
-    O que o sistema analisa?
-    </h2>
+    <h2>O que o sistema analisa?</h2>
 
     <div class="feature">
     <strong>✅ Documentos exigidos</strong><br>
@@ -479,14 +376,9 @@ with col2:
     <strong>✅ Próximos passos</strong><br>
     <span>Checklist prático para preparação.</span>
     </div>
-
     </div>
     """, unsafe_allow_html=True)
 
-
-# =========================
-# PROCESSAMENTO
-# =========================
 
 if arquivo is not None:
 
@@ -599,12 +491,8 @@ EDITAL:
                 )
 
 
-# =========================
-# FOOTER
-# =========================
-
 st.markdown("""
 <div class="footer">
-CredMed IA • MVP experimental para análise de credenciamentos médicos públicos
+CredMed IA • Análise inteligente de editais e credenciamentos médicos públicos
 </div>
 """, unsafe_allow_html=True)
