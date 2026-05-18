@@ -1,163 +1,21 @@
 import os
-import json
-import requests
-
 from io import BytesIO
 
 import streamlit as st
-
 from dotenv import load_dotenv
 from openai import OpenAI
 from pypdf import PdfReader
-
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
     Spacer
 )
-
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import letter
+from supabase import create_client, Client
 
-
-# ==========================================
+# =====================================
 # CONFIG
-# ==========================================
-
-load_dotenv()
-
-api_key = os.getenv("OPENAI_API_KEY")
-
-if not api_key:
-    api_key = st.secrets["OPENAI_API_KEY"]
-
-client = OpenAI(api_key=api_key)
-
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-
-
-# ==========================================
-# AUTH
-# ==========================================
-
-def cadastrar_usuario(email, senha):
-
-    url = f"{SUPABASE_URL}/auth/v1/signup"
-
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Content-Type": "application/json"
-    }
-
-    data = {
-        "email": email,
-        "password": senha
-    }
-
-    response = requests.post(
-        url,
-        headers=headers,
-        data=json.dumps(data)
-    )
-
-    return response
-
-
-def login_usuario(email, senha):
-
-    url = f"{SUPABASE_URL}/auth/v1/token?grant_type=password"
-
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Content-Type": "application/json"
-    }
-
-    data = {
-        "email": email,
-        "password": senha
-    }
-
-    response = requests.post(
-        url,
-        headers=headers,
-        data=json.dumps(data)
-    )
-
-    return response
-
-
-# ==========================================
-# SALVAR ANALISE
-# ==========================================
-
-def salvar_analise(nome_arquivo, resultado, user_email):
-
-    url = f"{SUPABASE_URL}/rest/v1/analyses"
-
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
-    }
-
-    data = {
-        "nome_arquivo": nome_arquivo,
-        "resultado": resultado,
-        "user_email": user_email
-    }
-
-    response = requests.post(
-        url,
-        headers=headers,
-        data=json.dumps(data)
-    )
-
-    return response.status_code
-
-
-# ==========================================
-# PDF
-# ==========================================
-
-def gerar_pdf(texto):
-
-    buffer = BytesIO()
-
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter
-    )
-
-    styles = getSampleStyleSheet()
-
-    elementos = []
-
-    linhas = texto.split("\n")
-
-    for linha in linhas:
-
-        elementos.append(
-            Paragraph(linha, styles["BodyText"])
-        )
-
-        elementos.append(
-            Spacer(1, 8)
-        )
-
-    doc.build(elementos)
-
-    pdf = buffer.getvalue()
-
-    buffer.close()
-
-    return pdf
-
-
-# ==========================================
-# PAGE
-# ==========================================
+# =====================================
 
 st.set_page_config(
     page_title="CredMed IA",
@@ -165,206 +23,368 @@ st.set_page_config(
     layout="wide"
 )
 
+load_dotenv()
 
-# ==========================================
-# SESSION
-# ==========================================
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
-if "logado" not in st.session_state:
-    st.session_state.logado = False
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
-if "email" not in st.session_state:
-    st.session_state.email = ""
+client = OpenAI(api_key=OPENAI_API_KEY)
 
+supabase: Client = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY
+)
 
-# ==========================================
-# LOGIN SCREEN
-# ==========================================
+# =====================================
+# CSS
+# =====================================
 
-if not st.session_state.logado:
+st.markdown("""
+<style>
+
+.main {
+    background: #0b1020;
+}
+
+.block-container {
+    padding-top: 2rem;
+}
+
+h1, h2, h3 {
+    color: white;
+}
+
+[data-testid="stSidebar"] {
+    background: #111827;
+}
+
+.stButton>button {
+    background: linear-gradient(
+        90deg,
+        #2563eb,
+        #7c3aed
+    );
+
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-weight: bold;
+}
+
+.stButton>button:hover {
+    opacity: 0.9;
+}
+
+.card {
+    background: #111827;
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid #1f2937;
+    margin-bottom: 20px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# =====================================
+# LOGIN / CADASTRO
+# =====================================
+
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+if st.session_state.user is None:
 
     st.title("🏥 CredMed IA")
 
-    aba1, aba2 = st.tabs(["Login", "Cadastro"])
+    tab1, tab2 = st.tabs([
+        "Login",
+        "Cadastro"
+    ])
 
     # LOGIN
-    with aba1:
+    with tab1:
 
         st.subheader("Entrar")
 
-        email_login = st.text_input(
-            "Email",
+        login_email = st.text_input(
+            "E-mail",
             key="login_email"
         )
 
-        senha_login = st.text_input(
+        login_password = st.text_input(
             "Senha",
             type="password",
-            key="login_senha"
+            key="login_password"
         )
 
         if st.button("Entrar"):
 
-            resposta = login_usuario(
-                email_login,
-                senha_login
-            )
+            try:
 
-            if resposta.status_code == 200:
+                response = supabase.auth.sign_in_with_password({
+                    "email": login_email,
+                    "password": login_password
+                })
 
-                st.session_state.logado = True
-                st.session_state.email = email_login
-
-                st.success("Login realizado!")
-
+                st.session_state.user = response.user.email
                 st.rerun()
 
-            else:
-
+            except:
                 st.error("Email ou senha inválidos")
 
     # CADASTRO
-    with aba2:
+    with tab2:
 
         st.subheader("Criar conta")
 
-        email_cadastro = st.text_input(
-            "Email ",
-            key="cad_email"
+        signup_email = st.text_input(
+            "E-mail",
+            key="signup_email"
         )
 
-        senha_cadastro = st.text_input(
-            "Senha ",
+        signup_password = st.text_input(
+            "Senha",
             type="password",
-            key="cad_senha"
+            key="signup_password"
         )
 
         if st.button("Criar Conta"):
 
-            resposta = cadastrar_usuario(
-                email_cadastro,
-                senha_cadastro
-            )
+            try:
 
-            if resposta.status_code in [200, 201]:
+                supabase.auth.sign_up({
+                    "email": signup_email,
+                    "password": signup_password
+                })
 
                 st.success(
                     "Conta criada com sucesso!"
                 )
 
-            else:
-
-                st.error(
-                    "Erro ao criar conta."
-                )
+            except Exception as e:
+                st.error(str(e))
 
     st.stop()
 
+# =====================================
+# USUÁRIO LOGADO
+# =====================================
 
-# ==========================================
-# APP
-# ==========================================
+user_email = st.session_state.user
 
-st.sidebar.success(
-    f"Logado como: {st.session_state.email}"
-)
+# =====================================
+# SIDEBAR
+# =====================================
 
-if st.sidebar.button("Logout"):
+with st.sidebar:
 
-    st.session_state.logado = False
-    st.session_state.email = ""
+    st.success(f"Logado como:\n\n{user_email}")
 
-    st.rerun()
+    if st.button("Logout"):
 
+        st.session_state.user = None
+        st.rerun()
 
-st.title("🏥 CredMed IA")
+    st.markdown("---")
 
-st.subheader(
-    "Plataforma SaaS de análise de credenciamentos médicos"
-)
+    st.markdown("## 📂 Histórico")
 
-arquivo = st.file_uploader(
+    try:
+
+        historico = supabase.table("analyses") \
+            .select("*") \
+            .eq("user_email", user_email) \
+            .order("id", desc=True) \
+            .execute()
+
+        if historico.data:
+
+            for item in historico.data:
+
+                with st.expander(
+                    f"📄 {item['nome_arquivo'][:25]}"
+                ):
+
+                    st.caption(item["criado_em"])
+
+                    if st.button(
+                        f"Abrir análise {item['id']}",
+                        key=f"abrir_{item['id']}"
+                    ):
+
+                        st.session_state[
+                            "resultado_antigo"
+                        ] = item["resultado"]
+
+        else:
+
+            st.info(
+                "Nenhuma análise encontrada."
+            )
+
+    except:
+        st.error("Erro ao carregar histórico")
+
+# =====================================
+# HEADER
+# =====================================
+
+st.markdown("""
+<div class="card">
+
+<h1>🏥 CredMed IA</h1>
+
+<h3>
+Plataforma SaaS de análise de
+credenciamentos médicos
+</h3>
+
+</div>
+""", unsafe_allow_html=True)
+
+# =====================================
+# UPLOAD
+# =====================================
+
+uploaded_file = st.file_uploader(
     "Envie um edital PDF",
     type=["pdf"]
 )
 
-if arquivo is not None:
+# =====================================
+# PROCESSAMENTO
+# =====================================
+
+if uploaded_file is not None:
 
     if st.button("🔍 Analisar Edital"):
 
-        with st.spinner("Analisando..."):
+        with st.spinner("Analisando edital..."):
 
-            reader = PdfReader(arquivo)
+            pdf = PdfReader(uploaded_file)
 
             texto = ""
 
-            for pagina in reader.pages:
+            for page in pdf.pages:
 
-                extraido = pagina.extract_text()
-
-                if extraido:
-                    texto += extraido + "\n"
+                try:
+                    texto += page.extract_text()
+                except:
+                    pass
 
             prompt = f"""
-Você é especialista em:
+            Analise este edital médico.
 
-- credenciamento médico
-- licitações
-- saúde pública
-- Lei 14.133
+            Gere:
 
-Analise o edital abaixo.
+            1. Resumo executivo
+            2. Documentos exigidos
+            3. Prazos importantes
+            4. Valores e pagamentos
+            5. Riscos do edital
+            6. Próximos passos
 
-Estruture:
+            EDITAL:
+            {texto[:15000]}
+            """
 
-1. Resumo
-2. Objeto
-3. Participantes
-4. Documentos
-5. Valores
-6. Prazos
-7. Riscos
-8. Próximos passos
-
-EDITAL:
-{texto}
-"""
-
-            resposta = client.responses.create(
+            response = client.responses.create(
                 model="gpt-4.1-mini",
                 input=prompt
             )
 
-            resultado = resposta.output_text
+            resultado = response.output_text
 
-            salvar_analise(
-                arquivo.name,
-                resultado,
-                st.session_state.email
-            )
+            # =====================================
+            # SALVAR SUPABASE
+            # =====================================
 
-            pdf = gerar_pdf(resultado)
+            try:
+
+                supabase.table("analyses").insert({
+
+                    "nome_arquivo":
+                        uploaded_file.name,
+
+                    "resultado":
+                        resultado,
+
+                    "user_email":
+                        user_email
+
+                }).execute()
+
+            except Exception as e:
+
+                st.error(
+                    f"Erro ao salvar: {e}"
+                )
+
+            # =====================================
+            # RESULTADO
+            # =====================================
 
             st.success("Análise concluída!")
 
             st.markdown(resultado)
 
-            c1, c2 = st.columns(2)
+            # =====================================
+            # PDF
+            # =====================================
 
-            with c1:
+            buffer = BytesIO()
 
-                st.download_button(
-                    label="📥 TXT",
-                    data=resultado,
-                    file_name="relatorio.txt",
-                    mime="text/plain"
+            doc = SimpleDocTemplate(buffer)
+
+            styles = getSampleStyleSheet()
+
+            story = []
+
+            story.append(
+                Paragraph(
+                    "Relatório CredMed IA",
+                    styles["Title"]
                 )
+            )
 
-            with c2:
+            story.append(
+                Spacer(1, 20)
+            )
 
-                st.download_button(
-                    label="📄 PDF",
-                    data=pdf,
-                    file_name="relatorio.pdf",
-                    mime="application/pdf"
+            story.append(
+                Paragraph(
+                    resultado.replace("\n", "<br/>"),
+                    styles["BodyText"]
                 )
+            )
+
+            doc.build(story)
+
+            pdf_bytes = buffer.getvalue()
+
+            st.download_button(
+                label="📄 Baixar PDF",
+                data=pdf_bytes,
+                file_name="relatorio.pdf",
+                mime="application/pdf"
+            )
+
+# =====================================
+# ANÁLISE ANTIGA
+# =====================================
+
+if "resultado_antigo" in st.session_state:
+
+    st.markdown("---")
+
+    st.subheader("📂 Análise salva")
+
+    st.markdown(
+        st.session_state[
+            "resultado_antigo"
+        ]
+    )
