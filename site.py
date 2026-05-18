@@ -1,5 +1,6 @@
 import os
 from io import BytesIO
+from datetime import datetime
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -38,29 +39,43 @@ supabase: Client = create_client(
 )
 
 # =====================================
-# CSS
+# CSS PREMIUM
 # =====================================
 
 st.markdown("""
 <style>
 
-.main {
-    background: #0b1020;
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
 }
 
-.block-container {
+.stApp {
+    background: #050816;
+}
+
+/* MAIN */
+.main .block-container {
     padding-top: 2rem;
+    max-width: 1300px;
 }
 
-h1, h2, h3 {
+/* TITLES */
+h1, h2, h3, h4 {
     color: white;
 }
 
+/* SIDEBAR */
 [data-testid="stSidebar"] {
-    background: #111827;
+    background: linear-gradient(
+        180deg,
+        #0b1020,
+        #111827
+    );
+    border-right: 1px solid #1f2937;
 }
 
-.stButton>button {
+/* BUTTONS */
+.stButton > button {
     background: linear-gradient(
         90deg,
         #2563eb,
@@ -69,28 +84,128 @@ h1, h2, h3 {
 
     color: white;
     border: none;
-    border-radius: 10px;
-    padding: 12px 18px;
-    font-weight: bold;
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-weight: 700;
+    transition: 0.3s;
 }
 
-.stButton>button:hover {
-    opacity: 0.9;
+.stButton > button:hover {
+    transform: scale(1.02);
+    opacity: 0.95;
 }
 
-.card {
+/* INPUTS */
+.stTextInput input,
+.stTextArea textarea {
     background: #111827;
-    padding: 20px;
-    border-radius: 15px;
+    color: white;
+    border-radius: 12px;
+}
+
+/* CARDS */
+.card {
+    background: linear-gradient(
+        180deg,
+        #111827,
+        #0f172a
+    );
+
     border: 1px solid #1f2937;
+    border-radius: 20px;
+    padding: 28px;
+
+    box-shadow:
+        0 0 20px rgba(0,0,0,0.3);
+
     margin-bottom: 20px;
+}
+
+/* METRIC */
+.metric-card {
+    background: linear-gradient(
+        180deg,
+        #111827,
+        #0b1020
+    );
+
+    border: 1px solid #1f2937;
+
+    border-radius: 18px;
+
+    padding: 22px;
+
+    text-align: center;
+}
+
+.metric-title {
+    color: #9ca3af;
+    font-size: 14px;
+}
+
+.metric-value {
+    color: white;
+    font-size: 32px;
+    font-weight: 800;
+}
+
+/* HISTORY */
+.history-card {
+    background: #111827;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid #1f2937;
+}
+
+/* SUCCESS */
+.stSuccess {
+    border-radius: 14px;
+}
+
+/* HEADER */
+.hero {
+    background:
+        radial-gradient(circle at top left,
+        rgba(124,58,237,0.4),
+        transparent 40%),
+
+        linear-gradient(
+            135deg,
+            #0f172a,
+            #111827
+        );
+
+    border: 1px solid #1f2937;
+
+    border-radius: 25px;
+
+    padding: 45px;
+
+    margin-bottom: 30px;
+}
+
+/* UPLOAD */
+[data-testid="stFileUploader"] {
+    background: #111827;
+    border-radius: 18px;
+    padding: 15px;
+}
+
+/* RESULT */
+.result-box {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 20px;
+    padding: 25px;
+    color: white;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================
-# LOGIN / CADASTRO
+# AUTH
 # =====================================
 
 if "user" not in st.session_state:
@@ -98,7 +213,19 @@ if "user" not in st.session_state:
 
 if st.session_state.user is None:
 
-    st.title("🏥 CredMed IA")
+    st.markdown("""
+    <div class="hero">
+
+    <h1>🏥 CredMed IA</h1>
+
+    <h3>
+    Plataforma SaaS premium para análise
+    inteligente de credenciamentos médicos
+    e editais públicos.
+    </h3>
+
+    </div>
+    """, unsafe_allow_html=True)
 
     tab1, tab2 = st.tabs([
         "Login",
@@ -131,6 +258,7 @@ if st.session_state.user is None:
                 })
 
                 st.session_state.user = response.user.email
+
                 st.rerun()
 
             except:
@@ -171,10 +299,22 @@ if st.session_state.user is None:
     st.stop()
 
 # =====================================
-# USUÁRIO LOGADO
+# USER
 # =====================================
 
 user_email = st.session_state.user
+
+# =====================================
+# HISTORY
+# =====================================
+
+historico = supabase.table("analyses") \
+    .select("*") \
+    .eq("user_email", user_email) \
+    .order("id", desc=True) \
+    .execute()
+
+analyses = historico.data
 
 # =====================================
 # SIDEBAR
@@ -182,7 +322,13 @@ user_email = st.session_state.user
 
 with st.sidebar:
 
-    st.success(f"Logado como:\n\n{user_email}")
+    st.markdown("## 🏥 CredMed IA")
+
+    st.success(f"""
+    Logado como:
+
+    {user_email}
+    """)
 
     if st.button("Logout"):
 
@@ -193,62 +339,137 @@ with st.sidebar:
 
     st.markdown("## 📂 Histórico")
 
-    try:
+    if analyses:
 
-        historico = supabase.table("analyses") \
-            .select("*") \
-            .eq("user_email", user_email) \
-            .order("id", desc=True) \
-            .execute()
+        for item in analyses:
 
-        if historico.data:
+            with st.expander(
+                f"📄 {item['nome_arquivo'][:28]}"
+            ):
 
-            for item in historico.data:
+                st.caption(item["criado_em"])
 
-                with st.expander(
-                    f"📄 {item['nome_arquivo'][:25]}"
+                if st.button(
+                    f"Abrir {item['id']}",
+                    key=f"abrir_{item['id']}"
                 ):
 
-                    st.caption(item["criado_em"])
+                    st.session_state[
+                        "resultado_antigo"
+                    ] = item["resultado"]
 
-                    if st.button(
-                        f"Abrir análise {item['id']}",
-                        key=f"abrir_{item['id']}"
-                    ):
+    else:
 
-                        st.session_state[
-                            "resultado_antigo"
-                        ] = item["resultado"]
-
-        else:
-
-            st.info(
-                "Nenhuma análise encontrada."
-            )
-
-    except:
-        st.error("Erro ao carregar histórico")
+        st.info("Nenhuma análise encontrada.")
 
 # =====================================
-# HEADER
+# HERO
 # =====================================
 
 st.markdown("""
-<div class="card">
+<div class="hero">
 
 <h1>🏥 CredMed IA</h1>
 
 <h3>
-Plataforma SaaS de análise de
-credenciamentos médicos
+Plataforma SaaS de análise inteligente
+de credenciamentos médicos,
+editais hospitalares e chamadas públicas.
 </h3>
 
 </div>
 """, unsafe_allow_html=True)
 
 # =====================================
-# UPLOAD
+# METRICS
 # =====================================
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+
+    st.markdown(f"""
+    <div class="metric-card">
+
+    <div class="metric-title">
+    Total de análises
+    </div>
+
+    <div class="metric-value">
+    {len(analyses)}
+    </div>
+
+    </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+
+    ultimo = "Hoje" if analyses else "-"
+
+    st.markdown(f"""
+    <div class="metric-card">
+
+    <div class="metric-title">
+    Último acesso
+    </div>
+
+    <div class="metric-value">
+    {ultimo}
+    </div>
+
+    </div>
+    """, unsafe_allow_html=True)
+
+with col3:
+
+    st.markdown(f"""
+    <div class="metric-card">
+
+    <div class="metric-title">
+    Plano
+    </div>
+
+    <div class="metric-value">
+    FREE
+    </div>
+
+    </div>
+    """, unsafe_allow_html=True)
+
+with col4:
+
+    st.markdown(f"""
+    <div class="metric-card">
+
+    <div class="metric-title">
+    Status
+    </div>
+
+    <div class="metric-value">
+    ONLINE
+    </div>
+
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# =====================================
+# UPLOAD AREA
+# =====================================
+
+st.markdown("""
+<div class="card">
+
+<h2>📄 Nova análise</h2>
+
+<p style="color:#9ca3af;">
+Envie um edital PDF e receba uma análise
+estruturada com IA.
+</p>
+
+</div>
+""", unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader(
     "Envie um edital PDF",
@@ -256,7 +477,7 @@ uploaded_file = st.file_uploader(
 )
 
 # =====================================
-# PROCESSAMENTO
+# ANALYSIS
 # =====================================
 
 if uploaded_file is not None:
@@ -299,42 +520,36 @@ if uploaded_file is not None:
 
             resultado = response.output_text
 
-            # =====================================
-            # SALVAR SUPABASE
-            # =====================================
+            # SAVE
 
-            try:
+            supabase.table("analyses").insert({
 
-                supabase.table("analyses").insert({
+                "nome_arquivo":
+                    uploaded_file.name,
 
-                    "nome_arquivo":
-                        uploaded_file.name,
+                "resultado":
+                    resultado,
 
-                    "resultado":
-                        resultado,
+                "user_email":
+                    user_email
 
-                    "user_email":
-                        user_email
+            }).execute()
 
-                }).execute()
-
-            except Exception as e:
-
-                st.error(
-                    f"Erro ao salvar: {e}"
-                )
-
-            # =====================================
-            # RESULTADO
-            # =====================================
+            # SHOW
 
             st.success("Análise concluída!")
 
+            st.markdown("""
+            <div class="result-box">
+            """, unsafe_allow_html=True)
+
             st.markdown(resultado)
 
-            # =====================================
+            st.markdown("""
+            </div>
+            """, unsafe_allow_html=True)
+
             # PDF
-            # =====================================
 
             buffer = BytesIO()
 
@@ -357,7 +572,10 @@ if uploaded_file is not None:
 
             story.append(
                 Paragraph(
-                    resultado.replace("\n", "<br/>"),
+                    resultado.replace(
+                        "\n",
+                        "<br/>"
+                    ),
                     styles["BodyText"]
                 )
             )
@@ -374,17 +592,31 @@ if uploaded_file is not None:
             )
 
 # =====================================
-# ANÁLISE ANTIGA
+# OLD RESULT
 # =====================================
 
 if "resultado_antigo" in st.session_state:
 
-    st.markdown("---")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    st.subheader("📂 Análise salva")
+    st.markdown("""
+    <div class="card">
+
+    <h2>📂 Análise salva</h2>
+
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="result-box">
+    """, unsafe_allow_html=True)
 
     st.markdown(
         st.session_state[
             "resultado_antigo"
         ]
     )
+
+    st.markdown("""
+    </div>
+    """, unsafe_allow_html=True)
