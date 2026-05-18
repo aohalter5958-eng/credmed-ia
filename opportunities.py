@@ -47,7 +47,6 @@ def consultar_pncp(estado="PR", dias=60, paginas=3):
                 continue
 
             dados = resposta.json()
-
             itens = dados.get("data", [])
 
             if not itens:
@@ -148,7 +147,7 @@ def pegar_link(item):
     sequencial = item.get("sequencialCompra")
 
     if cnpj and ano and sequencial:
-        return f"https://pncp.gov.br/app/editais/{cnpj}/{ano}/{sequencial}"
+        return f"https://pncp.gov.br/app/editais/{cnnpj}/{ano}/{sequencial}"
 
     return "https://pncp.gov.br/app/editais"
 
@@ -167,41 +166,38 @@ def renderizar_card_oportunidade(item):
     texto = texto_item(item)
     score = calcular_score(texto)
     relevancia = classificar_relevancia(score)
-
     tipo = "Credenciamento" if eh_credenciamento(texto) else "Licitação"
 
-    st.markdown(f"""
-    <div class="card">
-        <h2>📄 {titulo[:220]}</h2>
-
-        <p><b>Tipo detectado:</b> {tipo}</p>
-        <p><b>Relevância:</b> {relevancia}</p>
-        <p><b>Score inteligente:</b> {score}</p>
-        <p><b>Órgão:</b> {orgao}</p>
-        <p><b>Local:</b> {local}</p>
-        <p><b>Modalidade:</b> {modalidade}</p>
-        <p><b>Situação:</b> {situacao}</p>
-        <p><b>Fim das propostas:</b> {encerramento}</p>
-        <p><b>Valor estimado:</b> {valor}</p>
-
-        <p>
-            <a href="{link}" target="_blank">
-                🔗 Abrir no PNCP
-            </a>
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+f"""
+<div class="card">
+<h2>📄 {titulo[:220]}</h2>
+<p><b>Tipo detectado:</b> {tipo}</p>
+<p><b>Relevância:</b> {relevancia}</p>
+<p><b>Score inteligente:</b> {score}</p>
+<p><b>Órgão:</b> {orgao}</p>
+<p><b>Local:</b> {local}</p>
+<p><b>Modalidade:</b> {modalidade}</p>
+<p><b>Situação:</b> {situacao}</p>
+<p><b>Fim das propostas:</b> {encerramento}</p>
+<p><b>Valor estimado:</b> {valor}</p>
+<p><a href="{link}" target="_blank">🔗 Abrir no PNCP</a></p>
+</div>
+""",
+        unsafe_allow_html=True
+    )
 
 
 def tela_oportunidades():
-    st.markdown("""
-    <div class="card">
-        <h2>📡 Radar Real de Oportunidades</h2>
-        <p>
-        Busca real no PNCP por licitações e credenciamentos da área da saúde.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+"""
+<div class="card">
+<h2>📡 Radar Real de Oportunidades</h2>
+<p>Busca real no PNCP por licitações e credenciamentos da área da saúde.</p>
+</div>
+""",
+        unsafe_allow_html=True
+    )
 
     col1, col2 = st.columns(2)
 
@@ -258,14 +254,17 @@ def tela_oportunidades():
             reverse=True
         )
 
-        st.markdown(f"""
-        <div class="card">
-            <h2>Resultado da busca</h2>
-            <p><b>Fonte:</b> PNCP</p>
-            <p><b>Registros brutos consultados:</b> {len(itens)}</p>
-            <p><b>Oportunidades filtradas:</b> {len(oportunidades)}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+f"""
+<div class="card">
+<h2>Resultado da busca</h2>
+<p><b>Fonte:</b> PNCP</p>
+<p><b>Registros brutos consultados:</b> {len(itens)}</p>
+<p><b>Oportunidades filtradas:</b> {len(oportunidades)}</p>
+</div>
+""",
+            unsafe_allow_html=True
+        )
 
         if not oportunidades:
             st.warning(
