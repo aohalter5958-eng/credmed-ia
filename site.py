@@ -7,6 +7,7 @@ from pdf_generator import gerar_pdf
 from styles import aplicar_estilo
 from opportunities import tela_oportunidades
 from saved_opportunities import tela_oportunidades_salvas
+from alerts import tela_alertas
 
 
 st.set_page_config(
@@ -26,7 +27,6 @@ historico = buscar_historico(user_email)
 
 with st.sidebar:
     st.markdown("## 🏥 CredMed IA")
-
     st.success(f"Logado como:\n\n{user_email}")
 
     pagina = st.radio(
@@ -34,7 +34,8 @@ with st.sidebar:
         [
             "Painel",
             "Radar de Oportunidades",
-            "Base Inteligente"
+            "Base Inteligente",
+            "Meus Alertas"
         ]
     )
 
@@ -131,9 +132,7 @@ if pagina == "Painel":
                 )
 
                 st.session_state.resultado_atual = resultado
-
                 st.success("Análise concluída com sucesso!")
-
                 st.rerun()
 
     if "resultado_atual" in st.session_state:
@@ -192,3 +191,8 @@ elif pagina == "Radar de Oportunidades":
 elif pagina == "Base Inteligente":
 
     tela_oportunidades_salvas()
+
+
+elif pagina == "Meus Alertas":
+
+    tela_alertas(user_email)
