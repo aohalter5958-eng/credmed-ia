@@ -8,6 +8,7 @@ from styles import aplicar_estilo
 from opportunities import tela_oportunidades
 from saved_opportunities import tela_oportunidades_salvas
 from alerts import tela_alertas
+from professionals import tela_profissionais
 
 
 st.set_page_config(
@@ -35,7 +36,8 @@ with st.sidebar:
             "Painel",
             "Radar de Oportunidades",
             "Base Inteligente",
-            "Meus Alertas"
+            "Meus Alertas",
+            "Marketplace Profissional"
         ]
     )
 
@@ -64,7 +66,7 @@ if pagina == "Painel":
         <h1>🏥 CredMed IA</h1>
         <h3>
         Plataforma SaaS para análise inteligente de credenciamentos,
-        licitações públicas e oportunidades na saúde.
+        licitações públicas, oportunidades e profissionais da saúde.
         </h3>
     </div>
     """, unsafe_allow_html=True)
@@ -98,7 +100,7 @@ if pagina == "Painel":
     with col4:
         st.markdown("""
         <div class="metric-card">
-            <div class="metric-title">Status</div>
+            <div class="metric-title">Marketplace</div>
             <div class="metric-value">BETA</div>
         </div>
         """, unsafe_allow_html=True)
@@ -184,15 +186,13 @@ if pagina == "Painel":
 
 
 elif pagina == "Radar de Oportunidades":
-
     tela_oportunidades()
 
-
 elif pagina == "Base Inteligente":
-
     tela_oportunidades_salvas()
 
-
 elif pagina == "Meus Alertas":
-
     tela_alertas(user_email)
+
+elif pagina == "Marketplace Profissional":
+    tela_profissionais()
