@@ -1,4 +1,6 @@
 from supabase import create_client
+from datetime import datetime
+import hashlib
 import os
 from dotenv import load_dotenv
 
@@ -10,90 +12,91 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-# =========================
-# SALVAR ANÁLISE PDF
-# =========================
-def salvar_analise(
-    nome_arquivo,
-    resultado,
-    user_email
-):
-    response = (
-        supabase.table("analyses")
-        .insert({
-            "nome_arquivo": nome_arquivo,
-            "resultado": resultado,
-            "user_email": user_email
-        })
-        .execute()
+# ==========================================
+# GERAR HASH ÚNICO
+# ==========================================
+
+def gerar_hash_oportunidade(item):
+
+    texto = (
+        str(item.get("titulo", "")) +
+        str(item.get("orgao", "")) +
+        str(item.get("local", "")) +
+        str(item.get("valor", ""))
     )
 
-    return response
+    return hashlib.md5(texto.encode()).hexdigest()
 
 
-# =========================
-# BUSCAR HISTÓRICO
-# =========================
-def buscar_historico(user_email):
-    response = (
-        supabase.table("analyses")
-        .select("*")
-        .eq("user_email", user_email)
-        .order("id", desc=True)
-        .execute()
-    )
-
-    return response.data
-
-
-# =========================
+# ==========================================
 # SALVAR OPORTUNIDADE
-# =========================
-def salvar_oportunidade(dados):
+# ==========================================
+
+def salvar_oportunidade(item):
+
     try:
-        numero = dados.get("numero_controle_pncp")
+
+        hash_unico = gerar_hash_oportunidade(item)
 
         existente = (
-            supabase.table("opportunities")
+            supabase
+            .table("opportunities")
             .select("id")
-            .eq("numero_controle_pncp", numero)
+            .eq("hash_unico", hash_unico)
             .execute()
         )
 
         if existente.data:
-            return
+            return False
 
-        supabase.table("opportunities").insert({
-            "numero_controle_pncp": numero,
-            "titulo": dados.get("titulo"),
-            "tipo": dados.get("tipo"),
-            "relevancia": dados.get("relevancia"),
-            "score": dados.get("score"),
-            "orgao": dados.get("orgao"),
-            "local": dados.get("local"),
-            "modalidade": dados.get("modalidade"),
-            "situacao": dados.get("situacao"),
-            "fim_propostas": dados.get("fim_propostas"),
-            "valor_estimado": dados.get("valor_estimado"),
-            "link": dados.get("link"),
-            "fonte": "PNCP"
-        }).execute()
+        dados = {
+            "titulo": item.get("titulo"),
+            "orgao": item.get("orgao"),
+            "local": item.get("local"),
+            "modalidade": item.get("modalidade"),
+            "status": item.get("status"),
+            "valor": item.get("valor"),
+            "data_publicacao": item.get("data_publicacao"),
+            "link": item.get("link"),
+            "score": item.get("score"),
+            "tipo_detectado": item.get("tipo_detectado"),
+            "hash_unico": hash_unico,
+            "created_at": datetime.now().isoformat()
+        }
 
-    except Exception as erro:
-        print("ERRO AO SALVAR OPORTUNIDADE:")
-        print(erro)
+        (
+            supabase
+            .table("opportunities")
+            .insert(dados)
+            .execute()
+        )
+
+        return True
+
+    except Exception as e:
+        print(f"Erro ao salvar oportunidade: {e}")
+        return False
 
 
-# =========================
-# BUSCAR OPORTUNIDADES
-# =========================
+# ==========================================
+# BUSCAR OPORTUNIDADES SALVAS
+# ==========================================
+
 def buscar_oportunidades():
-    response = (
-        supabase.table("opportunities")
-        .select("*")
-        .order("score", desc=True)
-        .limit(200)
-        .execute()
-    )
 
-    return response.data
+    try:
+
+        response = (
+            supabase
+            .table("opportunities")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(200)
+            .execute()
+        )
+
+        return response.data
+
+    except Exception as e:
+        print(f"Erro ao buscar oportunidades: {e}")
+        return []
