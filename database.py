@@ -1,46 +1,59 @@
-from supabase import create_client
-from datetime import datetime
-import hashlib
 import os
+import hashlib
+import streamlit as st
 from dotenv import load_dotenv
+from supabase import create_client
 
 load_dotenv()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = st.secrets.get("SUPABASE_URL") or os.getenv("SUPABASE_URL")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY") or os.getenv("SUPABASE_KEY")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-# ==========================================
-# GERAR HASH ÚNICO
-# ==========================================
+def salvar_analise(nome_arquivo, resultado, user_email):
+    return (
+        supabase.table("analyses")
+        .insert({
+            "nome_arquivo": nome_arquivo,
+            "resultado": resultado,
+            "user_email": user_email
+        })
+        .execute()
+    )
+
+
+def buscar_historico(user_email):
+    response = (
+        supabase.table("analyses")
+        .select("*")
+        .eq("user_email", user_email)
+        .order("id", desc=True)
+        .execute()
+    )
+
+    return response.data
+
 
 def gerar_hash_oportunidade(item):
-
     texto = (
+        str(item.get("numero_controle_pncp", "")) +
         str(item.get("titulo", "")) +
         str(item.get("orgao", "")) +
         str(item.get("local", "")) +
-        str(item.get("valor", ""))
+        str(item.get("valor_estimado", ""))
     )
 
-    return hashlib.md5(texto.encode()).hexdigest()
+    return hashlib.md5(texto.encode("utf-8")).hexdigest()
 
-
-# ==========================================
-# SALVAR OPORTUNIDADE
-# ==========================================
 
 def salvar_oportunidade(item):
-
     try:
-
         hash_unico = gerar_hash_oportunidade(item)
 
         existente = (
-            supabase
-            .table("opportunities")
+            supabase.table("opportunities")
             .select("id")
             .eq("hash_unico", hash_unico)
             .execute()
@@ -50,53 +63,45 @@ def salvar_oportunidade(item):
             return False
 
         dados = {
+            "numero_controle_pncp": item.get("numero_controle_pncp"),
             "titulo": item.get("titulo"),
+            "tipo": item.get("tipo"),
+            "relevancia": item.get("relevancia"),
+            "score": item.get("score"),
             "orgao": item.get("orgao"),
             "local": item.get("local"),
             "modalidade": item.get("modalidade"),
-            "status": item.get("status"),
-            "valor": item.get("valor"),
-            "data_publicacao": item.get("data_publicacao"),
+            "situacao": item.get("situacao"),
+            "fim_propostas": item.get("fim_propostas"),
+            "valor_estimado": item.get("valor_estimado"),
             "link": item.get("link"),
-            "score": item.get("score"),
-            "tipo_detectado": item.get("tipo_detectado"),
-            "hash_unico": hash_unico,
-            "created_at": datetime.now().isoformat()
+            "fonte": "PNCP",
+            "hash_unico": hash_unico
         }
 
-        (
-            supabase
-            .table("opportunities")
-            .insert(dados)
-            .execute()
-        )
+        supabase.table("opportunities").insert(dados).execute()
 
         return True
 
-    except Exception as e:
-        print(f"Erro ao salvar oportunidade: {e}")
+    except Exception as erro:
+        print("Erro ao salvar oportunidade:")
+        print(erro)
         return False
 
 
-# ==========================================
-# BUSCAR OPORTUNIDADES SALVAS
-# ==========================================
-
 def buscar_oportunidades():
-
     try:
-
         response = (
-            supabase
-            .table("opportunities")
+            supabase.table("opportunities")
             .select("*")
-            .order("created_at", desc=True)
+            .order("score", desc=True)
             .limit(200)
             .execute()
         )
 
         return response.data
 
-    except Exception as e:
-        print(f"Erro ao buscar oportunidades: {e}")
+    except Exception as erro:
+        print("Erro ao buscar oportunidades:")
+        print(erro)
         return []
