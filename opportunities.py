@@ -1,462 +1,154 @@
-import requests
 import streamlit as st
-from datetime import date, timedelta
+import requests
 
-from smart_filters import (
-    calcular_score,
-    classificar_relevancia,
-    oportunidade_valida
-)
-
+from smart_filters import oportunidade_valida
 from database import salvar_oportunidade
 
 
-PNCP_URL = "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta"
+def renderizar_card_oportunidade(item):
+    st.markdown(
+        f"""
+        <div style="
+            background: #0f1230;
+            padding: 25px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.08);
+        ">
+            <h2 style="color:white;">
+                📄 {item.get('titulo', 'Sem título')}
+            </h2>
+
+            <p><b>Tipo detectado:</b> {item.get('tipo')}</p>
+            <p><b>Relevância:</b> {item.get('relevancia')}</p>
+            <p><b>Score inteligente:</b> {item.get('score')}</p>
+            <p><b>Órgão:</b> {item.get('orgao')}</p>
+            <p><b>Local:</b> {item.get('local')}</p>
+            <p><b>Modalidade:</b> {item.get('modalidade')}</p>
+            <p><b>Situação:</b> {item.get('situacao')}</p>
+            <p><b>Fim das propostas:</b> {item.get('fim_propostas')}</p>
+            <p><b>Valor estimado:</b> R$ {item.get('valor_estimado')}</p>
+
+            <a href="{item.get('link')}" target="_blank">
+                🔗 Abrir oportunidade
+            </a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
-# =====================================================
-# CONSULTAR PNCP
-# =====================================================
-
-def consultar_pncp(
-    estado="PR",
-    dias=60,
-    paginas=3
-):
-
-    resultados = []
-
-    data_final = (
-        date.today() + timedelta(days=dias)
-    ).strftime("%Y%m%d")
+def consultar_pncp(paginas=3):
+    oportunidades = []
 
     for pagina in range(1, paginas + 1):
-
-        params = {
-            "dataFinal": data_final,
-            "pagina": pagina,
-            "tamanhoPagina": 25,
-        }
-
-        if estado != "Todos":
-            params["uf"] = estado
-
         try:
-
-            resposta = requests.get(
-                PNCP_URL,
-                params=params,
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "CredMed-IA"
-                },
-                timeout=12
+            url = (
+                "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao"
+                f"?pagina={pagina}&tamanhoPagina=20"
             )
 
-            if resposta.status_code != 200:
+            response = requests.get(url, timeout=30)
+
+            if response.status_code != 200:
                 continue
 
-            dados = resposta.json()
+            dados = response.json()
 
-            itens = dados.get("data", [])
+            lista = dados.get("data", [])
 
-            if not itens:
-                break
+            for item in lista:
 
-            resultados.extend(itens)
+                titulo = item.get("objetoCompra", "")
 
-        except requests.exceptions.Timeout:
+                oportunidade = {
+                    "numero_controle_pncp": item.get("numeroControlePNCP"),
+                    "titulo": titulo,
+                    "tipo": "Credenciamento",
+                    "relevancia": "Alta",
+                    "score": 60,
+                    "orgao": item.get("orgaoEntidade", {}).get("razaoSocial"),
+                    "local": item.get("unidadeOrgao", {}).get("municipioNome"),
+                    "modalidade": item.get("modalidadeNome"),
+                    "situacao": item.get("situacaoCompraNome"),
+                    "fim_propostas": item.get("dataEncerramentoProposta"),
+                    "valor_estimado": item.get("valorTotalEstimado"),
+                    "link": item.get("linkSistemaOrigem")
+                }
 
+                if oportunidade_valida(titulo):
+                    oportunidades.append(oportunidade)
+
+        except Exception as erro:
             st.warning(
                 f"O PNCP demorou demais na página {pagina}. "
                 f"A busca continuou com os dados encontrados."
             )
 
-            break
+    return oportunidades
 
-        except Exception as erro:
-
-            st.error(f"Erro ao consultar PNCP: {erro}")
-
-    return resultados
-
-
-# =====================================================
-# TEXTO ITEM
-# =====================================================
-
-def texto_item(item):
-
-    partes = []
-
-    campos = [
-        "objetoCompra",
-        "informacaoComplementar",
-        "modalidadeNome",
-        "situacaoCompraNome",
-        "numeroCompra",
-        "processo"
-    ]
-
-    for campo in campos:
-        partes.append(str(item.get(campo, "")))
-
-    orgao = item.get("orgaoEntidade", {})
-    unidade = item.get("unidadeOrgao", {})
-
-    if isinstance(orgao, dict):
-        partes.append(str(orgao.get("razaoSocial", "")))
-
-    if isinstance(unidade, dict):
-        partes.append(str(unidade.get("municipioNome", "")))
-        partes.append(str(unidade.get("ufSigla", "")))
-
-    return " ".join(partes).lower()
-
-
-# =====================================================
-# IDENTIFICAR CREDENCIAMENTO
-# =====================================================
-
-def eh_credenciamento(texto):
-
-    return (
-        "credenciamento" in texto
-        or "credenciar" in texto
-        or "credenciado" in texto
-    )
-
-
-# =====================================================
-# FILTROS
-# =====================================================
-
-def passa_filtros(
-    item,
-    tipo,
-    palavra_chave
-):
-
-    texto = texto_item(item)
-
-    if not oportunidade_valida(texto):
-        return False
-
-    if tipo == "Credenciamento":
-
-        if not eh_credenciamento(texto):
-            return False
-
-    if tipo == "Licitação":
-
-        if eh_credenciamento(texto):
-            return False
-
-    if palavra_chave:
-
-        if palavra_chave.lower().strip() not in texto:
-            return False
-
-    return True
-
-
-# =====================================================
-# PEGAR ÓRGÃO
-# =====================================================
-
-def pegar_orgao(item):
-
-    orgao = item.get("orgaoEntidade", {})
-
-    if isinstance(orgao, dict):
-        return orgao.get(
-            "razaoSocial",
-            "Órgão não informado"
-        )
-
-    return "Órgão não informado"
-
-
-# =====================================================
-# PEGAR LOCAL
-# =====================================================
-
-def pegar_local(item):
-
-    unidade = item.get("unidadeOrgao", {})
-
-    if isinstance(unidade, dict):
-
-        cidade = unidade.get(
-            "municipioNome",
-            "Cidade não informada"
-        )
-
-        uf = unidade.get(
-            "ufSigla",
-            ""
-        )
-
-        return f"{cidade}/{uf}"
-
-    return "Local não informado"
-
-
-# =====================================================
-# PEGAR LINK PNCP
-# =====================================================
-
-def pegar_link(item):
-
-    cnpj = item.get("cnpjOrgao")
-    ano = item.get("anoCompra")
-    sequencial = item.get("sequencialCompra")
-
-    if cnpj and ano and sequencial:
-
-        return (
-            f"https://pncp.gov.br/app/editais/"
-            f"{cnpj}/{ano}/{sequencial}"
-        )
-
-    return "https://pncp.gov.br/app/editais"
-
-
-# =====================================================
-# CARD VISUAL
-# =====================================================
-
-def renderizar_card_oportunidade(item):
-
-    titulo = item.get(
-        "objetoCompra",
-        "Objeto não informado"
-    )
-
-    texto = texto_item(item)
-
-    score = calcular_score(texto)
-
-    relevancia = classificar_relevancia(score)
-
-    tipo = (
-        "Credenciamento"
-        if eh_credenciamento(texto)
-        else "Licitação"
-    )
-
-    with st.container(border=True):
-
-        st.subheader(f"📄 {titulo[:250]}")
-
-        st.write(f"**Tipo detectado:** {tipo}")
-
-        st.write(f"**Relevância:** {relevancia}")
-
-        st.write(f"**Score inteligente:** {score}")
-
-        st.write(f"**Órgão:** {pegar_orgao(item)}")
-
-        st.write(f"**Local:** {pegar_local(item)}")
-
-        st.write(
-            f"**Modalidade:** "
-            f"{item.get('modalidadeNome', 'Não informado')}"
-        )
-
-        st.write(
-            f"**Situação:** "
-            f"{item.get('situacaoCompraNome', 'Não informado')}"
-        )
-
-        st.write(
-            f"**Fim das propostas:** "
-            f"{item.get('dataEncerramentoProposta', 'Não informado')}"
-        )
-
-        st.write(
-            f"**Valor estimado:** "
-            f"R$ {item.get('valorTotalEstimado', 'Não informado')}"
-        )
-
-        st.link_button(
-            "🔗 Abrir no PNCP",
-            pegar_link(item)
-        )
-
-
-# =====================================================
-# TELA OPORTUNIDADES
-# =====================================================
 
 def tela_oportunidades():
-
-    st.markdown("## 📡 Radar Real de Oportunidades")
-
-    st.write(
-        "Busca inteligente em tempo real no PNCP."
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-
-        tipo = st.selectbox(
-            "Tipo de oportunidade",
-            [
-                "Todos",
-                "Credenciamento",
-                "Licitação"
-            ]
-        )
-
-        estado = st.selectbox(
-            "Estado",
-            [
-                "PR",
-                "SP",
-                "SC",
-                "RS",
-                "MG",
-                "RJ",
-                "Todos"
-            ]
-        )
-
-    with col2:
-
-        palavra_chave = st.text_input(
-            "Palavra-chave opcional",
-            placeholder="Ex: médico, UPA, hospital..."
-        )
-
-        dias = st.slider(
-            "Buscar oportunidades até quantos dias?",
-            7,
-            120,
-            60,
-            step=7
-        )
+    st.title("Radar de Oportunidades")
 
     paginas = st.slider(
-        "Profundidade da busca",
+        "Quantidade de páginas PNCP",
         1,
-        8,
+        10,
         3
     )
 
     if st.button("🔎 Buscar oportunidades reais"):
 
-        with st.spinner(
-            "Consultando PNCP em tempo real..."
-        ):
+        with st.spinner("Consultando PNCP em tempo real..."):
 
-            itens = consultar_pncp(
-                estado=estado,
-                dias=dias,
-                paginas=paginas
-            )
+            oportunidades = consultar_pncp(paginas)
 
-        oportunidades = [
-            item for item in itens
-            if passa_filtros(
-                item,
-                tipo,
-                palavra_chave
-            )
-        ]
+            st.subheader("Resultado da busca")
 
-        oportunidades = sorted(
-            oportunidades,
-            key=lambda x: calcular_score(
-                texto_item(x)
-            ),
-            reverse=True
-        )
+            st.write(f"Fonte: PNCP")
+            st.write(f"Registros brutos: {len(oportunidades)}")
 
-        st.markdown("## Resultado da busca")
-
-        st.write(f"**Fonte:** PNCP")
-
-        st.write(
-            f"**Registros brutos:** "
-            f"{len(itens)}"
-        )
-
-        st.write(
-            f"**Oportunidades filtradas:** "
-            f"{len(oportunidades)}"
-        )
-
-        if not oportunidades:
-
-            st.warning(
-                "Nenhuma oportunidade relevante encontrada."
-            )
-
-        else:
-
-            novas_salvas = 0
-            duplicadas = 0
+            oportunidades_filtradas = []
 
             for item in oportunidades:
 
-                texto = texto_item(item)
+                if oportunidade_valida(item["titulo"]):
+                    oportunidades_filtradas.append(item)
 
-                score = calcular_score(texto)
+            st.write(
+                f"Oportunidades filtradas: "
+                f"{len(oportunidades_filtradas)}"
+            )
 
-                relevancia = classificar_relevancia(score)
+            salvas = 0
+            duplicadas = 0
 
-                tipo_detectado = (
-                    "Credenciamento"
-                    if eh_credenciamento(texto)
-                    else "Licitação"
-                )
+            for item in oportunidades_filtradas:
 
-                dados_salvar = {
-                    "numero_controle_pncp": item.get("numeroControlePNCP"),
-                    "titulo": item.get("objetoCompra"),
-                    "tipo": tipo_detectado,
-                    "tipo_detectado": tipo_detectado,
-                    "relevancia": relevancia,
-                    "score": score,
-                    "orgao": pegar_orgao(item),
-                    "local": pegar_local(item),
-                    "modalidade": item.get("modalidadeNome"),
-                    "status": item.get("situacaoCompraNome"),
-                    "situacao": item.get("situacaoCompraNome"),
-                    "valor": str(item.get("valorTotalEstimado")),
-                    "valor_estimado": str(
-                        item.get("valorTotalEstimado")
-                    ),
-                    "data_publicacao": item.get(
-                        "dataPublicacaoPncp"
-                    ),
-                    "fim_propostas": item.get(
-                        "dataEncerramentoProposta"
-                    ),
-                    "link": pegar_link(item),
-                }
+                sucesso = salvar_oportunidade(item)
 
-                salvou = salvar_oportunidade(
-                    dados_salvar
-                )
-
-                if salvou:
-                    novas_salvas += 1
+                if sucesso:
+                    salvas += 1
                 else:
                     duplicadas += 1
 
-                renderizar_card_oportunidade(item)
-
             st.success(
-                f"✅ {novas_salvas} novas oportunidades "
-                f"foram salvas no banco."
+                f"✅ {salvas} oportunidades novas salvas "
+                f"automaticamente na Base Inteligente."
             )
 
             if duplicadas > 0:
-
                 st.info(
                     f"♻️ {duplicadas} oportunidades "
                     f"duplicadas foram ignoradas."
                 )
+
+            if not oportunidades_filtradas:
+                st.warning(
+                    "Nenhuma oportunidade relevante encontrada."
+                )
+
+            else:
+                for item in oportunidades_filtradas:
+                    renderizar_card_oportunidade(item)
