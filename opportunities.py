@@ -17,6 +17,7 @@ PNCP_URL = "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta"
 # =====================================================
 # CONSULTAR PNCP
 # =====================================================
+
 def consultar_pncp(
     estado="PR",
     dias=60,
@@ -83,6 +84,7 @@ def consultar_pncp(
 # =====================================================
 # TEXTO ITEM
 # =====================================================
+
 def texto_item(item):
 
     partes = []
@@ -115,6 +117,7 @@ def texto_item(item):
 # =====================================================
 # IDENTIFICAR CREDENCIAMENTO
 # =====================================================
+
 def eh_credenciamento(texto):
 
     return (
@@ -127,6 +130,7 @@ def eh_credenciamento(texto):
 # =====================================================
 # FILTROS
 # =====================================================
+
 def passa_filtros(
     item,
     tipo,
@@ -159,6 +163,7 @@ def passa_filtros(
 # =====================================================
 # PEGAR ÓRGÃO
 # =====================================================
+
 def pegar_orgao(item):
 
     orgao = item.get("orgaoEntidade", {})
@@ -175,6 +180,7 @@ def pegar_orgao(item):
 # =====================================================
 # PEGAR LOCAL
 # =====================================================
+
 def pegar_local(item):
 
     unidade = item.get("unidadeOrgao", {})
@@ -199,6 +205,7 @@ def pegar_local(item):
 # =====================================================
 # PEGAR LINK PNCP
 # =====================================================
+
 def pegar_link(item):
 
     cnpj = item.get("cnpjOrgao")
@@ -218,6 +225,7 @@ def pegar_link(item):
 # =====================================================
 # CARD VISUAL
 # =====================================================
+
 def renderizar_card_oportunidade(item):
 
     titulo = item.get(
@@ -280,6 +288,7 @@ def renderizar_card_oportunidade(item):
 # =====================================================
 # TELA OPORTUNIDADES
 # =====================================================
+
 def tela_oportunidades():
 
     st.markdown("## 📡 Radar Real de Oportunidades")
@@ -387,6 +396,9 @@ def tela_oportunidades():
 
         else:
 
+            novas_salvas = 0
+            duplicadas = 0
+
             for item in oportunidades:
 
                 texto = texto_item(item)
@@ -405,19 +417,46 @@ def tela_oportunidades():
                     "numero_controle_pncp": item.get("numeroControlePNCP"),
                     "titulo": item.get("objetoCompra"),
                     "tipo": tipo_detectado,
+                    "tipo_detectado": tipo_detectado,
                     "relevancia": relevancia,
                     "score": score,
                     "orgao": pegar_orgao(item),
                     "local": pegar_local(item),
                     "modalidade": item.get("modalidadeNome"),
+                    "status": item.get("situacaoCompraNome"),
                     "situacao": item.get("situacaoCompraNome"),
-                    "fim_propostas": item.get("dataEncerramentoProposta"),
+                    "valor": str(item.get("valorTotalEstimado")),
                     "valor_estimado": str(
                         item.get("valorTotalEstimado")
+                    ),
+                    "data_publicacao": item.get(
+                        "dataPublicacaoPncp"
+                    ),
+                    "fim_propostas": item.get(
+                        "dataEncerramentoProposta"
                     ),
                     "link": pegar_link(item),
                 }
 
-                salvar_oportunidade(dados_salvar)
+                salvou = salvar_oportunidade(
+                    dados_salvar
+                )
+
+                if salvou:
+                    novas_salvas += 1
+                else:
+                    duplicadas += 1
 
                 renderizar_card_oportunidade(item)
+
+            st.success(
+                f"✅ {novas_salvas} novas oportunidades "
+                f"foram salvas no banco."
+            )
+
+            if duplicadas > 0:
+
+                st.info(
+                    f"♻️ {duplicadas} oportunidades "
+                    f"duplicadas foram ignoradas."
+                )
