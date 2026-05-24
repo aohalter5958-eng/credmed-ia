@@ -94,7 +94,8 @@ def consultar_pncp(paginas=3):
     oportunidades = []
 
     headers = {
-        "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json"
     }
 
     for pagina in range(1, paginas + 1):
@@ -102,7 +103,7 @@ def consultar_pncp(paginas=3):
         try:
 
             url = (
-                "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao"
+                "https://pncp.gov.br/api/search/"
                 f"?pagina={pagina}"
                 "&tamanhoPagina=20"
             )
@@ -118,16 +119,16 @@ def consultar_pncp(paginas=3):
 
             dados = response.json()
 
-            lista = dados.get("data", [])
+            lista = dados.get("items", [])
 
             for item in lista:
 
-                titulo = item.get("objetoCompra", "")
+                titulo = item.get("titulo", "")
 
                 oportunidade = {
 
                     "numero_controle_pncp":
-                        item.get("numeroControlePNCP"),
+                        item.get("id"),
 
                     "titulo":
                         titulo,
@@ -142,35 +143,25 @@ def consultar_pncp(paginas=3):
                         60,
 
                     "orgao":
-                        item.get(
-                            "orgaoEntidade",
-                            {}
-                        ).get(
-                            "razaoSocial"
-                        ),
+                        item.get("orgao"),
 
                     "local":
-                        item.get(
-                            "unidadeOrgao",
-                            {}
-                        ).get(
-                            "municipioNome"
-                        ),
+                        item.get("municipio"),
 
                     "modalidade":
-                        item.get("modalidadeNome"),
+                        item.get("modalidade"),
 
                     "situacao":
-                        item.get("situacaoCompraNome"),
+                        item.get("situacao"),
 
                     "fim_propostas":
-                        item.get("dataEncerramentoProposta"),
+                        item.get("dataEncerramento"),
 
                     "valor_estimado":
-                        item.get("valorTotalEstimado"),
+                        item.get("valor"),
 
                     "link":
-                        item.get("linkSistemaOrigem")
+                        item.get("link")
                 }
 
                 if oportunidade_valida(titulo):
