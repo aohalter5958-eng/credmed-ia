@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from smart_filters import (
     calcular_score,
     classificar_relevancia,
-    oportunidade_valida
+    oportunidade_relevante
 )
 
 from database import salvar_oportunidade
@@ -45,17 +45,21 @@ def eh_credenciamento(texto):
 
 def pegar_orgao(item):
     orgao = item.get("orgaoEntidade", {})
+
     if isinstance(orgao, dict):
         return orgao.get("razaoSocial", "Órgão não informado")
+
     return "Órgão não informado"
 
 
 def pegar_local(item):
     unidade = item.get("unidadeOrgao", {})
+
     if isinstance(unidade, dict):
         cidade = unidade.get("municipioNome", "Cidade não informada")
         uf = unidade.get("ufSigla", "")
         return f"{cidade}/{uf}"
+
     return "Local não informado"
 
 
@@ -79,7 +83,7 @@ def pegar_link(item):
 def passa_filtros(item, tipo, palavra_chave):
     texto = texto_item(item)
 
-    if not oportunidade_valida(texto):
+    if not oportunidade_relevante(item):
         return False
 
     if tipo == "Credenciamento" and not eh_credenciamento(texto):
@@ -125,7 +129,9 @@ def consultar_pncp(estado, dias, paginas):
             )
 
             if resposta.status_code != 200:
-                st.warning(f"PNCP retornou status {resposta.status_code} na página {pagina}.")
+                st.warning(
+                    f"PNCP retornou status {resposta.status_code} na página {pagina}."
+                )
                 continue
 
             dados = resposta.json()
@@ -137,11 +143,15 @@ def consultar_pncp(estado, dias, paginas):
             resultados.extend(itens)
 
         except requests.exceptions.Timeout:
-            st.warning(f"O PNCP demorou demais na página {pagina}. A busca continuou.")
+            st.warning(
+                f"O PNCP demorou demais na página {pagina}. A busca continuou."
+            )
             break
 
         except Exception as erro:
-            st.warning(f"Erro ao consultar PNCP na página {pagina}: {erro}")
+            st.warning(
+                f"Erro ao consultar PNCP na página {pagina}: {erro}"
+            )
 
     return resultados
 
@@ -149,10 +159,14 @@ def consultar_pncp(estado, dias, paginas):
 def transformar_item(item):
     texto = texto_item(item)
 
-    score = calcular_score(texto)
+    score = calcular_score(item)
     relevancia = classificar_relevancia(score)
 
-    tipo = "Credenciamento" if eh_credenciamento(texto) else "Licitação"
+    tipo = (
+        "Credenciamento"
+        if eh_credenciamento(texto)
+        else "Licitação"
+    )
 
     return {
         "numero_controle_pncp": item.get("numeroControlePNCP"),
@@ -164,8 +178,14 @@ def transformar_item(item):
         "local": pegar_local(item),
         "modalidade": item.get("modalidadeNome", "Não informado"),
         "situacao": item.get("situacaoCompraNome", "Não informado"),
-        "fim_propostas": item.get("dataEncerramentoProposta", "Não informado"),
-        "valor_estimado": item.get("valorTotalEstimado", "Não informado"),
+        "fim_propostas": item.get(
+            "dataEncerramentoProposta",
+            "Não informado"
+        ),
+        "valor_estimado": item.get(
+            "valorTotalEstimado",
+            "Não informado"
+        ),
         "link": pegar_link(item)
     }
 
@@ -180,7 +200,10 @@ def renderizar_card_oportunidade(item):
             margin-bottom:25px;
             border:1px solid rgba(255,255,255,0.08);
         ">
-            <h2 style="color:white;">📄 {item['titulo'][:260]}</h2>
+            <h2 style="color:white;">
+                📄 {item['titulo'][:260]}
+            </h2>
+
             <p><b>Tipo detectado:</b> {item['tipo']}</p>
             <p><b>Relevância:</b> {item['relevancia']}</p>
             <p><b>Score inteligente:</b> {item['score']}</p>
@@ -190,8 +213,18 @@ def renderizar_card_oportunidade(item):
             <p><b>Situação:</b> {item['situacao']}</p>
             <p><b>Fim das propostas:</b> {item['fim_propostas']}</p>
             <p><b>Valor estimado:</b> R$ {item['valor_estimado']}</p>
+
             <a href="{item['link']}" target="_blank"
-               style="display:inline-block;margin-top:12px;padding:10px 18px;background:#8b5cf6;color:white;text-decoration:none;border-radius:12px;font-weight:bold;">
+               style="
+                    display:inline-block;
+                    margin-top:12px;
+                    padding:10px 18px;
+                    background:#8b5cf6;
+                    color:white;
+                    text-decoration:none;
+                    border-radius:12px;
+                    font-weight:bold;
+               ">
                🔗 Abrir no PNCP
             </a>
         </div>
@@ -238,6 +271,7 @@ def tela_oportunidades():
     )
 
     if st.button("🔎 Buscar oportunidades reais"):
+
         with st.spinner("Consultando PNCP em tempo real..."):
             itens = consultar_pncp(
                 estado=estado,
@@ -271,13 +305,20 @@ def tela_oportunidades():
             else:
                 duplicadas += 1
 
-        st.success(f"✅ {salvas} oportunidades novas salvas automaticamente na Base Inteligente.")
+        st.success(
+            f"✅ {salvas} oportunidades novas salvas automaticamente na Base Inteligente."
+        )
 
         if duplicadas:
-            st.info(f"♻️ {duplicadas} oportunidades duplicadas ignoradas.")
+            st.info(
+                f"♻️ {duplicadas} oportunidades duplicadas ignoradas."
+            )
 
         if not filtradas:
-            st.warning("Nenhuma oportunidade relevante encontrada.")
+            st.warning(
+                "Nenhuma oportunidade relevante encontrada."
+            )
+
         else:
             for item in filtradas:
                 renderizar_card_oportunidade(item)

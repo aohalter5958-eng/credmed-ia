@@ -23,17 +23,45 @@ PALAVRAS_SAUDE = [
 
 
 def texto_oportunidade(item):
-    return (
-        f"{item.get('titulo', '')} "
-        f"{item.get('objetoCompra', '')} "
-        f"{item.get('orgaoEntidade', {}).get('razaoSocial', '')}"
-    ).lower()
+    partes = [
+        str(item.get("titulo", "")),
+        str(item.get("objetoCompra", "")),
+        str(item.get("informacaoComplementar", "")),
+        str(item.get("modalidadeNome", "")),
+        str(item.get("situacaoCompraNome", ""))
+    ]
+
+    orgao = item.get("orgaoEntidade", {})
+    unidade = item.get("unidadeOrgao", {})
+
+    if isinstance(orgao, dict):
+        partes.append(str(orgao.get("razaoSocial", "")))
+
+    if isinstance(unidade, dict):
+        partes.append(str(unidade.get("municipioNome", "")))
+        partes.append(str(unidade.get("ufSigla", "")))
+
+    texto = " ".join(partes)
+
+    texto = texto.lower()
+
+    texto = re.sub(r"\s+", " ", texto)
+
+    return texto
 
 
 def detectar_tipo(item):
-    modalidade = str(item.get("modalidadeNome", "")).lower()
+    modalidade = str(
+        item.get("modalidadeNome", "")
+    ).lower()
 
-    if "credenciamento" in modalidade:
+    texto = texto_oportunidade(item)
+
+    if (
+        "credenciamento" in modalidade
+        or "credenciamento" in texto
+        or "credenciar" in texto
+    ):
         return "Credenciamento"
 
     return "Licitação"
@@ -44,35 +72,45 @@ def calcular_score(item):
 
     score = 0
 
-    # Saúde
+    # Palavras da saúde
     for palavra in PALAVRAS_SAUDE:
-        if palavra in texto:
+        if palavra.lower() in texto:
             score += 10
 
     # Credenciamento
-    modalidade = str(item.get("modalidadeNome", "")).lower()
-
-    if "credenciamento" in modalidade:
+    if (
+        "credenciamento" in texto
+        or "credenciar" in texto
+    ):
         score += 25
 
     # Hospital / UBS / UPA
-    if any(x in texto for x in ["hospital", "ubs", "upa"]):
+    if any(
+        x in texto
+        for x in ["hospital", "ubs", "upa"]
+    ):
         score += 20
 
-    # Contratação urgente
-    if any(x in texto for x in [
-        "urgente",
-        "emergencial",
-        "imediata"
-    ]):
+    # Urgência
+    if any(
+        x in texto
+        for x in [
+            "urgente",
+            "emergencial",
+            "imediata"
+        ]
+    ):
         score += 15
 
     # Suspenso / cancelado
-    if any(x in texto for x in [
-        "suspenso",
-        "cancelado",
-        "fracassado"
-    ]):
+    if any(
+        x in texto
+        for x in [
+            "suspenso",
+            "cancelado",
+            "fracassado"
+        ]
+    ):
         score -= 30
 
     # Limites
@@ -83,6 +121,7 @@ def calcular_score(item):
 
 
 def classificar_relevancia(score):
+
     if score >= 90:
         return "🔥 Excelente"
 
@@ -96,11 +135,14 @@ def classificar_relevancia(score):
 
 
 def oportunidade_relevante(item):
+
     score = calcular_score(item)
+
     return score >= 50
 
 
 def transformar_oportunidade(item):
+
     score = calcular_score(item)
 
     orgao = (
@@ -108,21 +150,64 @@ def transformar_oportunidade(item):
         .get("razaoSocial", "Não informado")
     )
 
-    municipio = item.get("unidadeOrgao", {}).get("municipioNome", "")
-    uf = item.get("unidadeOrgao", {}).get("ufSigla", "")
+    unidade = item.get("unidadeOrgao", {})
 
-    local = f"{municipio}/{uf}" if municipio else uf
+    municipio = unidade.get(
+        "municipioNome",
+        ""
+    )
+
+    uf = unidade.get(
+        "ufSigla",
+        ""
+    )
+
+    local = (
+        f"{municipio}/{uf}"
+        if municipio
+        else uf
+    )
 
     return {
-        "titulo": item.get("objetoCompra", "Sem título"),
+        "titulo": item.get(
+            "objetoCompra",
+            "Sem título"
+        ),
+
         "orgao": orgao,
+
         "local": local,
-        "modalidade": item.get("modalidadeNome", ""),
-        "situacao": item.get("situacaoCompraNome", ""),
-        "valor_estimado": item.get("valorTotalEstimado", 0),
-        "fim_propostas": item.get("dataEncerramentoProposta", ""),
-        "link": item.get("linkSistemaOrigem", ""),
+
+        "modalidade": item.get(
+            "modalidadeNome",
+            ""
+        ),
+
+        "situacao": item.get(
+            "situacaoCompraNome",
+            ""
+        ),
+
+        "valor_estimado": item.get(
+            "valorTotalEstimado",
+            0
+        ),
+
+        "fim_propostas": item.get(
+            "dataEncerramentoProposta",
+            ""
+        ),
+
+        "link": item.get(
+            "linkSistemaOrigem",
+            ""
+        ),
+
         "score": score,
-        "relevancia": classificar_relevancia(score),
+
+        "relevancia": classificar_relevancia(
+            score
+        ),
+
         "tipo": detectar_tipo(item)
     }
