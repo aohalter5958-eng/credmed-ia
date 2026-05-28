@@ -1,6 +1,3 @@
-import re
-
-
 PALAVRAS_SAUDE = [
     "médico",
     "medica",
@@ -23,75 +20,60 @@ PALAVRAS_SAUDE = [
 
 
 def texto_oportunidade(item):
+
     partes = [
-        str(item.get("titulo", "")),
         str(item.get("objetoCompra", "")),
+        str(item.get("titulo", "")),
         str(item.get("informacaoComplementar", "")),
         str(item.get("modalidadeNome", "")),
-        str(item.get("situacaoCompraNome", ""))
     ]
 
     orgao = item.get("orgaoEntidade", {})
-    unidade = item.get("unidadeOrgao", {})
 
     if isinstance(orgao, dict):
-        partes.append(str(orgao.get("razaoSocial", "")))
+        partes.append(
+            str(orgao.get("razaoSocial", ""))
+        )
 
-    if isinstance(unidade, dict):
-        partes.append(str(unidade.get("municipioNome", "")))
-        partes.append(str(unidade.get("ufSigla", "")))
-
-    texto = " ".join(partes)
-
-    texto = texto.lower()
-
-    texto = re.sub(r"\s+", " ", texto)
-
-    return texto
+    return " ".join(partes).lower()
 
 
 def detectar_tipo(item):
+
     modalidade = str(
         item.get("modalidadeNome", "")
     ).lower()
 
-    texto = texto_oportunidade(item)
-
-    if (
-        "credenciamento" in modalidade
-        or "credenciamento" in texto
-        or "credenciar" in texto
-    ):
+    if "credenciamento" in modalidade:
         return "Credenciamento"
 
     return "Licitação"
 
 
 def calcular_score(item):
+
     texto = texto_oportunidade(item)
 
     score = 0
 
-    # Palavras da saúde
     for palavra in PALAVRAS_SAUDE:
+
         if palavra.lower() in texto:
             score += 10
 
-    # Credenciamento
-    if (
-        "credenciamento" in texto
-        or "credenciar" in texto
-    ):
-        score += 25
+    if "credenciamento" in texto:
+        score += 30
 
-    # Hospital / UBS / UPA
     if any(
         x in texto
-        for x in ["hospital", "ubs", "upa"]
+        for x in [
+            "hospital",
+            "ubs",
+            "upa"
+        ]
     ):
         score += 20
 
-    # Urgência
     if any(
         x in texto
         for x in [
@@ -102,18 +84,16 @@ def calcular_score(item):
     ):
         score += 15
 
-    # Suspenso / cancelado
     if any(
         x in texto
         for x in [
-            "suspenso",
             "cancelado",
-            "fracassado"
+            "fracassado",
+            "suspenso"
         ]
     ):
-        score -= 30
+        score -= 40
 
-    # Limites
     score = max(score, 0)
     score = min(score, 100)
 
@@ -152,23 +132,13 @@ def transformar_oportunidade(item):
 
     unidade = item.get("unidadeOrgao", {})
 
-    municipio = unidade.get(
-        "municipioNome",
-        ""
-    )
+    cidade = unidade.get("municipioNome", "")
+    uf = unidade.get("ufSigla", "")
 
-    uf = unidade.get(
-        "ufSigla",
-        ""
-    )
-
-    local = (
-        f"{municipio}/{uf}"
-        if municipio
-        else uf
-    )
+    local = f"{cidade}/{uf}"
 
     return {
+
         "titulo": item.get(
             "objetoCompra",
             "Sem título"
@@ -211,3 +181,75 @@ def transformar_oportunidade(item):
 
         "tipo": detectar_tipo(item)
     }
+
+
+def calcular_match(
+    oportunidade_texto,
+    profissional
+):
+
+    texto = oportunidade_texto.lower()
+
+    pontos = 0
+
+    especialidade = str(
+        profissional.get(
+            "especialidade",
+            ""
+        )
+    ).lower()
+
+    palavras = str(
+        profissional.get(
+            "palavras_chave",
+            ""
+        )
+    ).lower()
+
+    experiencia = str(
+        profissional.get(
+            "experiencia",
+            ""
+        )
+    ).lower()
+
+    profissao = str(
+        profissional.get(
+            "profissao",
+            ""
+        )
+    ).lower()
+
+    dados_profissional = (
+        especialidade
+        + " "
+        + palavras
+        + " "
+        + experiencia
+        + " "
+        + profissao
+    )
+
+    for palavra in texto.split():
+
+        if palavra in dados_profissional:
+            pontos += 5
+
+    if "plantão" in texto and (
+        "plantão" in dados_profissional
+    ):
+        pontos += 20
+
+    if "upa" in texto and (
+        "upa" in dados_profissional
+    ):
+        pontos += 20
+
+    if "hospital" in texto and (
+        "hospital" in dados_profissional
+    ):
+        pontos += 20
+
+    pontos = min(pontos, 100)
+
+    return pontos
