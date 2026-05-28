@@ -4,3 +4,4 @@ python-dotenv
 pypdf
 reportlab
 supabase
+plotly
