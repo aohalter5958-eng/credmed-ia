@@ -5,100 +5,28 @@ from datetime import date, timedelta
 from smart_filters import (
     calcular_score,
     classificar_relevancia,
-    oportunidade_relevante
+    oportunidade_relevante,
+    transformar_oportunidade,
+    calcular_match
 )
 
-from database import salvar_oportunidade
+from database import (
+    salvar_oportunidade,
+    buscar_oportunidades
+)
+
+from professionals import buscar_profissionais
 
 
 PNCP_URL = "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta"
 
 
-def texto_item(item):
-    partes = [
-        str(item.get("objetoCompra", "")),
-        str(item.get("informacaoComplementar", "")),
-        str(item.get("modalidadeNome", "")),
-        str(item.get("situacaoCompraNome", "")),
-    ]
+def consultar_pncp(
+    estado,
+    dias,
+    paginas
+):
 
-    orgao = item.get("orgaoEntidade", {})
-    unidade = item.get("unidadeOrgao", {})
-
-    if isinstance(orgao, dict):
-        partes.append(str(orgao.get("razaoSocial", "")))
-
-    if isinstance(unidade, dict):
-        partes.append(str(unidade.get("municipioNome", "")))
-        partes.append(str(unidade.get("ufSigla", "")))
-
-    return " ".join(partes).lower()
-
-
-def eh_credenciamento(texto):
-    return (
-        "credenciamento" in texto
-        or "credenciar" in texto
-        or "credenciado" in texto
-    )
-
-
-def pegar_orgao(item):
-    orgao = item.get("orgaoEntidade", {})
-
-    if isinstance(orgao, dict):
-        return orgao.get("razaoSocial", "Órgão não informado")
-
-    return "Órgão não informado"
-
-
-def pegar_local(item):
-    unidade = item.get("unidadeOrgao", {})
-
-    if isinstance(unidade, dict):
-        cidade = unidade.get("municipioNome", "Cidade não informada")
-        uf = unidade.get("ufSigla", "")
-        return f"{cidade}/{uf}"
-
-    return "Local não informado"
-
-
-def pegar_link(item):
-    orgao = item.get("orgaoEntidade", {})
-    cnpj = item.get("cnpjOrgao")
-
-    if isinstance(orgao, dict):
-        cnpj = cnpj or orgao.get("cnpj")
-
-    ano = item.get("anoCompra")
-    sequencial = item.get("sequencialCompra")
-
-    if cnpj and ano and sequencial:
-        return f"https://pncp.gov.br/app/editais/{cnpj}/{ano}/{sequencial}"
-
-    numero = item.get("numeroControlePNCP", "")
-    return f"https://pncp.gov.br/app/editais?q={numero}"
-
-
-def passa_filtros(item, tipo, palavra_chave):
-    texto = texto_item(item)
-
-    if not oportunidade_relevante(item):
-        return False
-
-    if tipo == "Credenciamento" and not eh_credenciamento(texto):
-        return False
-
-    if tipo == "Licitação" and eh_credenciamento(texto):
-        return False
-
-    if palavra_chave and palavra_chave.lower().strip() not in texto:
-        return False
-
-    return True
-
-
-def consultar_pncp(estado, dias, paginas):
     resultados = []
 
     data_final = (
@@ -107,10 +35,11 @@ def consultar_pncp(estado, dias, paginas):
 
     headers = {
         "Accept": "application/json",
-        "User-Agent": "CredMed-IA/1.0"
+        "User-Agent": "CredMed-IA"
     }
 
     for pagina in range(1, paginas + 1):
+
         params = {
             "dataFinal": data_final,
             "pagina": pagina,
@@ -121,20 +50,19 @@ def consultar_pncp(estado, dias, paginas):
             params["uf"] = estado
 
         try:
-            resposta = requests.get(
+
+            response = requests.get(
                 PNCP_URL,
                 params=params,
                 headers=headers,
                 timeout=30
             )
 
-            if resposta.status_code != 200:
-                st.warning(
-                    f"PNCP retornou status {resposta.status_code} na página {pagina}."
-                )
+            if response.status_code != 200:
                 continue
 
-            dados = resposta.json()
+            dados = response.json()
+
             itens = dados.get("data", [])
 
             if not itens:
@@ -142,118 +70,172 @@ def consultar_pncp(estado, dias, paginas):
 
             resultados.extend(itens)
 
-        except requests.exceptions.Timeout:
-            st.warning(
-                f"O PNCP demorou demais na página {pagina}. A busca continuou."
-            )
-            break
-
         except Exception as erro:
             st.warning(
-                f"Erro ao consultar PNCP na página {pagina}: {erro}"
+                f"Erro ao consultar PNCP: {erro}"
             )
 
     return resultados
 
 
-def transformar_item(item):
-    texto = texto_item(item)
+def renderizar_match(
+    oportunidade,
+    profissionais
+):
 
-    score = calcular_score(item)
-    relevancia = classificar_relevancia(score)
-
-    tipo = (
-        "Credenciamento"
-        if eh_credenciamento(texto)
-        else "Licitação"
+    texto = (
+        oportunidade.get("titulo", "")
+        + " "
+        + oportunidade.get("orgao", "")
     )
 
-    return {
-        "numero_controle_pncp": item.get("numeroControlePNCP"),
-        "titulo": item.get("objetoCompra", "Objeto não informado"),
-        "tipo": tipo,
-        "relevancia": relevancia,
-        "score": score,
-        "orgao": pegar_orgao(item),
-        "local": pegar_local(item),
-        "modalidade": item.get("modalidadeNome", "Não informado"),
-        "situacao": item.get("situacaoCompraNome", "Não informado"),
-        "fim_propostas": item.get(
-            "dataEncerramentoProposta",
-            "Não informado"
-        ),
-        "valor_estimado": item.get(
-            "valorTotalEstimado",
-            "Não informado"
-        ),
-        "link": pegar_link(item)
-    }
+    matches = []
+
+    for profissional in profissionais:
+
+        pontos = calcular_match(
+            texto,
+            profissional
+        )
+
+        if pontos >= 30:
+
+            matches.append({
+                "nome": profissional.get("nome"),
+                "profissao": profissional.get("profissao"),
+                "especialidade": profissional.get("especialidade"),
+                "score": pontos,
+                "cidade": profissional.get("cidade"),
+                "estado": profissional.get("estado")
+            })
+
+    matches = sorted(
+        matches,
+        key=lambda x: x["score"],
+        reverse=True
+    )
+
+    if matches:
+
+        st.markdown("### 👥 Profissionais compatíveis")
+
+        for match in matches[:5]:
+
+            st.markdown(
+                f"""
+                <div style="
+                    background:#111827;
+                    padding:15px;
+                    border-radius:12px;
+                    margin-bottom:10px;
+                    border:1px solid rgba(255,255,255,0.06);
+                ">
+
+                <b>{match['nome']}</b><br>
+
+                {match['profissao']} —
+                {match['especialidade']}<br>
+
+                📍 {match['cidade']}/{match['estado']}<br>
+
+                🎯 Compatibilidade:
+                <b>{match['score']}%</b>
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
 
-def renderizar_card_oportunidade(item):
+def renderizar_card(item):
+
     st.markdown(
         f"""
         <div style="
             background:#0f1230;
             padding:25px;
             border-radius:20px;
-            margin-bottom:25px;
+            margin-bottom:20px;
             border:1px solid rgba(255,255,255,0.08);
         ">
-            <h2 style="color:white;">
-                📄 {item['titulo'][:260]}
-            </h2>
 
-            <p><b>Tipo detectado:</b> {item['tipo']}</p>
-            <p><b>Relevância:</b> {item['relevancia']}</p>
-            <p><b>Score inteligente:</b> {item['score']}</p>
-            <p><b>Órgão:</b> {item['orgao']}</p>
-            <p><b>Local:</b> {item['local']}</p>
-            <p><b>Modalidade:</b> {item['modalidade']}</p>
-            <p><b>Situação:</b> {item['situacao']}</p>
-            <p><b>Fim das propostas:</b> {item['fim_propostas']}</p>
-            <p><b>Valor estimado:</b> R$ {item['valor_estimado']}</p>
+        <h2 style="color:white;">
+            📄 {item['titulo']}
+        </h2>
 
-            <a href="{item['link']}" target="_blank"
-               style="
-                    display:inline-block;
-                    margin-top:12px;
-                    padding:10px 18px;
-                    background:#8b5cf6;
-                    color:white;
-                    text-decoration:none;
-                    border-radius:12px;
-                    font-weight:bold;
-               ">
-               🔗 Abrir no PNCP
-            </a>
+        <p><b>Tipo:</b> {item['tipo']}</p>
+
+        <p><b>Relevância:</b>
+        {item['relevancia']}</p>
+
+        <p><b>Score:</b>
+        {item['score']}</p>
+
+        <p><b>Órgão:</b>
+        {item['orgao']}</p>
+
+        <p><b>Local:</b>
+        {item['local']}</p>
+
+        <p><b>Modalidade:</b>
+        {item['modalidade']}</p>
+
+        <p><b>Situação:</b>
+        {item['situacao']}</p>
+
+        <p><b>Valor estimado:</b>
+        R$ {item['valor_estimado']}</p>
+
+        <a href="{item['link']}"
+           target="_blank"
+           style="
+           display:inline-block;
+           margin-top:10px;
+           padding:10px 18px;
+           background:#8b5cf6;
+           color:white;
+           text-decoration:none;
+           border-radius:10px;
+           font-weight:bold;
+           ">
+           🔗 Abrir no PNCP
+        </a>
+
         </div>
         """,
         unsafe_allow_html=True
     )
 
+    profissionais = buscar_profissionais()
+
+    renderizar_match(
+        item,
+        profissionais
+    )
+
 
 def tela_oportunidades():
+
     st.title("Radar de Oportunidades")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        tipo = st.selectbox(
-            "Tipo",
-            ["Todos", "Credenciamento", "Licitação"]
-        )
 
         estado = st.selectbox(
             "Estado",
-            ["PR", "SP", "SC", "RS", "MG", "RJ", "Todos"]
+            [
+                "PR",
+                "SP",
+                "SC",
+                "RS",
+                "MG",
+                "RJ",
+                "Todos"
+            ]
         )
 
     with col2:
-        palavra_chave = st.text_input(
-            "Palavra-chave opcional",
-            placeholder="Ex: médico, UPA, hospital, enfermagem..."
-        )
 
         dias = st.slider(
             "Buscar oportunidades até quantos dias?",
@@ -270,55 +252,63 @@ def tela_oportunidades():
         3
     )
 
-    if st.button("🔎 Buscar oportunidades reais"):
+    if st.button(
+        "🔎 Buscar oportunidades reais"
+    ):
 
-        with st.spinner("Consultando PNCP em tempo real..."):
+        with st.spinner(
+            "Consultando PNCP..."
+        ):
+
             itens = consultar_pncp(
-                estado=estado,
-                dias=dias,
-                paginas=paginas
+                estado,
+                dias,
+                paginas
             )
 
-        filtradas = [
-            transformar_item(item)
-            for item in itens
-            if passa_filtros(item, tipo, palavra_chave)
-        ]
+        oportunidades = []
 
-        filtradas = sorted(
-            filtradas,
+        for item in itens:
+
+            if oportunidade_relevante(item):
+
+                oportunidade = (
+                    transformar_oportunidade(item)
+                )
+
+                oportunidades.append(
+                    oportunidade
+                )
+
+        oportunidades = sorted(
+            oportunidades,
             key=lambda x: x["score"],
             reverse=True
         )
 
-        st.subheader("Resultado da busca")
-        st.write("**Fonte:** PNCP")
-        st.write(f"**Registros brutos:** {len(itens)}")
-        st.write(f"**Oportunidades filtradas:** {len(filtradas)}")
-
         salvas = 0
-        duplicadas = 0
 
-        for item in filtradas:
+        for item in oportunidades:
+
             if salvar_oportunidade(item):
                 salvas += 1
-            else:
-                duplicadas += 1
 
         st.success(
-            f"✅ {salvas} oportunidades novas salvas automaticamente na Base Inteligente."
+            f"✅ {salvas} oportunidades salvas automaticamente."
         )
 
-        if duplicadas:
-            st.info(
-                f"♻️ {duplicadas} oportunidades duplicadas ignoradas."
-            )
+        st.write(
+            f"Resultados encontrados: {len(oportunidades)}"
+        )
 
-        if not filtradas:
+        if not oportunidades:
+
             st.warning(
                 "Nenhuma oportunidade relevante encontrada."
             )
 
         else:
-            for item in filtradas:
-                renderizar_card_oportunidade(item)
+
+            for item in oportunidades:
+
+                renderizar_card(item)
