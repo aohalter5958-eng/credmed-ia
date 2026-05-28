@@ -1,143 +1,128 @@
-# =========================================
-# FILTROS INTELIGENTES CREDMED IA
-# =========================================
+import re
+
 
 PALAVRAS_SAUDE = [
-
     "médico",
     "medica",
     "medicina",
-    "enfermeiro",
     "enfermagem",
-    "hospital",
-    "upa",
-    "ubs",
-    "plantão",
-    "clinico",
-    "clínico",
-    "psicólogo",
-    "psicologia",
-    "fisioterapia",
-    "fisioterapeuta",
-    "odontologia",
-    "odontólogo",
-    "farmácia",
+    "enfermeiro",
     "farmaceutico",
+    "farmácia",
+    "hospital",
+    "ubs",
+    "upa",
     "laboratório",
-    "laboratorio",
+    "fisioterapia",
+    "psicologia",
+    "odontologia",
     "saúde",
-    "saude",
-    "cirurgia",
-    "cirurgião",
-    "técnico de enfermagem",
-    "terapeuta",
-    "fonoaudiólogo",
-    "nutricionista",
-    "cardiologista",
-    "neurologista",
-    "ortopedista",
-    "pediatra",
-    "ginecologista",
-    "radiologia",
-    "anestesia",
-    "ambulância",
-    "ambulancia",
-    "pronto socorro",
-    "samu",
-    "credenciamento médico",
-    "serviços hospitalares",
-    "serviços médicos"
-
+    "clinica",
+    "biomedicina"
 ]
 
-# =========================================
-# PALAVRAS QUE DEVEM SER EXCLUÍDAS
-# =========================================
 
-PALAVRAS_EXCLUIR = [
+def texto_oportunidade(item):
+    return (
+        f"{item.get('titulo', '')} "
+        f"{item.get('objetoCompra', '')} "
+        f"{item.get('orgaoEntidade', {}).get('razaoSocial', '')}"
+    ).lower()
 
-    "veterinária",
-    "veterinario",
-    "veterinário",
-    "castração animal",
-    "ração",
-    "cães",
-    "gatos",
-    "animais",
-    "pet",
-    "petshop",
-    "combustível",
-    "combustivel",
-    "merenda",
-    "uniforme escolar",
-    "material de construção",
-    "pavimentação",
-    "asfalto",
-    "limpeza urbana",
-    "coleta de lixo",
-    "transporte escolar"
 
-]
+def detectar_tipo(item):
+    modalidade = str(item.get("modalidadeNome", "")).lower()
 
-# =========================================
-# CLASSIFICAR RELEVÂNCIA
-# =========================================
+    if "credenciamento" in modalidade:
+        return "Credenciamento"
 
-def calcular_score(texto):
+    return "Licitação"
 
-    texto = texto.lower()
+
+def calcular_score(item):
+    texto = texto_oportunidade(item)
 
     score = 0
 
-    # SOMA PONTOS
+    # Saúde
     for palavra in PALAVRAS_SAUDE:
-
         if palavra in texto:
             score += 10
 
-    # REMOVE PONTOS
-    for palavra in PALAVRAS_EXCLUIR:
+    # Credenciamento
+    modalidade = str(item.get("modalidadeNome", "")).lower()
 
-        if palavra in texto:
-            score -= 30
+    if "credenciamento" in modalidade:
+        score += 25
+
+    # Hospital / UBS / UPA
+    if any(x in texto for x in ["hospital", "ubs", "upa"]):
+        score += 20
+
+    # Contratação urgente
+    if any(x in texto for x in [
+        "urgente",
+        "emergencial",
+        "imediata"
+    ]):
+        score += 15
+
+    # Suspenso / cancelado
+    if any(x in texto for x in [
+        "suspenso",
+        "cancelado",
+        "fracassado"
+    ]):
+        score -= 30
+
+    # Limites
+    score = max(score, 0)
+    score = min(score, 100)
 
     return score
 
 
-# =========================================
-# CLASSIFICAÇÃO
-# =========================================
-
 def classificar_relevancia(score):
+    if score >= 90:
+        return "🔥 Excelente"
+
+    if score >= 70:
+        return "✅ Muito boa"
 
     if score >= 50:
-        return "🟢 Excelente"
+        return "⚠️ Média"
 
-    elif score >= 20:
-        return "🟡 Média"
-
-    else:
-        return "🔴 Baixa"
+    return "❌ Fraca"
 
 
-# =========================================
-# VALIDAR SE É SAÚDE REAL
-# =========================================
+def oportunidade_relevante(item):
+    score = calcular_score(item)
+    return score >= 50
 
-def oportunidade_valida(texto):
 
-    texto = texto.lower()
+def transformar_oportunidade(item):
+    score = calcular_score(item)
 
-    # EXCLUIR PALAVRAS RUINS
-    for palavra in PALAVRAS_EXCLUIR:
+    orgao = (
+        item.get("orgaoEntidade", {})
+        .get("razaoSocial", "Não informado")
+    )
 
-        if palavra in texto:
-            return False
+    municipio = item.get("unidadeOrgao", {}).get("municipioNome", "")
+    uf = item.get("unidadeOrgao", {}).get("ufSigla", "")
 
-    # PRECISA TER PALAVRA DE SAÚDE
-    for palavra in PALAVRAS_SAUDE:
+    local = f"{municipio}/{uf}" if municipio else uf
 
-        if palavra in texto:
-            return True
-
-    return False
+    return {
+        "titulo": item.get("objetoCompra", "Sem título"),
+        "orgao": orgao,
+        "local": local,
+        "modalidade": item.get("modalidadeNome", ""),
+        "situacao": item.get("situacaoCompraNome", ""),
+        "valor_estimado": item.get("valorTotalEstimado", 0),
+        "fim_propostas": item.get("dataEncerramentoProposta", ""),
+        "link": item.get("linkSistemaOrigem", ""),
+        "score": score,
+        "relevancia": classificar_relevancia(score),
+        "tipo": detectar_tipo(item)
+    }
