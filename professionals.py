@@ -1,228 +1,155 @@
 import streamlit as st
-from supabase import create_client
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+from database import supabase
 
 
-def salvar_profissional(dados):
-    supabase.table("professionals").insert(dados).execute()
+def salvar_profissional(
+    nome,
+    profissao,
+    especialidade,
+    estado,
+    cidade,
+    telefone,
+    email,
+    disponibilidade
+):
+    dados = {
+        "nome": nome,
+        "profissao": profissao,
+        "especialidade": especialidade,
+        "estado": estado,
+        "cidade": cidade,
+        "telefone": telefone,
+        "email": email,
+        "disponibilidade": disponibilidade
+    }
+
+    supabase.table("profissionais").insert(dados).execute()
 
 
 def buscar_profissionais():
     response = (
-        supabase.table("professionals")
+        supabase
+        .table("profissionais")
         .select("*")
-        .order("id", desc=True)
+        .order("created_at", desc=True)
         .execute()
     )
 
-    return response.data
+    return response.data if response.data else []
 
 
-def tela_profissionais():
+def card_profissional(item):
+    with st.container(border=True):
 
-    st.markdown("## 👩‍⚕️ Marketplace de Profissionais da Saúde")
+        st.markdown(
+            f"""
+            ### 👨‍⚕️ {item.get("nome", "Profissional")}
+
+            **Profissão:** {item.get("profissao", "-")}
+
+            **Especialidade:** {item.get("especialidade", "-")}
+
+            **Estado:** {item.get("estado", "-")}
+
+            **Cidade:** {item.get("cidade", "-")}
+
+            **Disponibilidade:** {item.get("disponibilidade", "-")}
+
+            **Telefone:** {item.get("telefone", "-")}
+
+            **Email:** {item.get("email", "-")}
+            """
+        )
+
+
+def tela_marketplace_profissional():
+
+    st.title("🏥 Marketplace Profissional")
 
     st.write(
-        "Cadastro e busca de profissionais para empresas que atuam em credenciamentos e licitações."
+        "Cadastre profissionais da saúde para oportunidades e credenciamentos."
     )
 
-    aba1, aba2 = st.tabs(
-        [
-            "Cadastrar profissional",
-            "Buscar profissionais"
-        ]
-    )
+    with st.form("cadastro_profissional"):
 
-    with aba1:
+        nome = st.text_input("Nome completo")
 
-        st.markdown("### Novo profissional")
-
-        with st.form("form_profissional"):
-
-            nome = st.text_input("Nome completo")
-
-            profissao = st.selectbox(
-                "Profissão",
-                [
-                    "Médico",
-                    "Enfermeiro",
-                    "Técnico de Enfermagem",
-                    "Fisioterapeuta",
-                    "Psicólogo",
-                    "Farmacêutico",
-                    "Dentista",
-                    "Biomédico",
-                    "Radiologista",
-                    "Nutricionista",
-                    "Outro"
-                ]
-            )
-
-            especialidade = st.text_input(
-                "Especialidade",
-                placeholder="Ex: Clínico Geral, Pediatria, UTI, PSF..."
-            )
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                estado = st.selectbox(
-                    "Estado",
-                    [
-                        "PR",
-                        "SP",
-                        "SC",
-                        "RS",
-                        "MG",
-                        "RJ",
-                        "Todos"
-                    ]
-                )
-
-            with col2:
-                cidade = st.text_input("Cidade")
-
-            telefone = st.text_input("Telefone / WhatsApp")
-
-            email = st.text_input("E-mail")
-
-            experiencia = st.text_area(
-                "Experiência profissional",
-                placeholder="Descreva experiência em UPA, UBS, hospital, plantões, SUS..."
-            )
-
-            valor_plantao = st.text_input(
-                "Valor desejado por plantão / hora",
-                placeholder="Ex: R$ 1.200 por plantão"
-            )
-
-            disponibilidade = st.selectbox(
-                "Disponibilidade",
-                [
-                    "Imediata",
-                    "Durante a semana",
-                    "Finais de semana",
-                    "Plantões noturnos",
-                    "A combinar"
-                ]
-            )
-
-            enviar = st.form_submit_button(
-                "💾 Salvar profissional"
-            )
-
-        if enviar:
-
-            dados = {
-                "nome": nome,
-                "profissao": profissao,
-                "especialidade": especialidade,
-                "estado": estado,
-                "cidade": cidade,
-                "telefone": telefone,
-                "email": email,
-                "experiencia": experiencia,
-                "valor_plantao": valor_plantao,
-                "disponibilidade": disponibilidade
-            }
-
-            salvar_profissional(dados)
-
-            st.success("Profissional cadastrado com sucesso!")
-
-    with aba2:
-
-        st.markdown("### Buscar profissionais")
-
-        profissionais = buscar_profissionais()
-
-        filtro_profissao = st.selectbox(
-            "Filtrar por profissão",
+        profissao = st.selectbox(
+            "Profissão",
             [
-                "Todos",
                 "Médico",
                 "Enfermeiro",
-                "Técnico de Enfermagem",
                 "Fisioterapeuta",
                 "Psicólogo",
                 "Farmacêutico",
-                "Dentista",
                 "Biomédico",
-                "Radiologista",
-                "Nutricionista",
+                "Técnico de Enfermagem",
+                "Dentista",
                 "Outro"
             ]
         )
 
-        filtro_estado = st.selectbox(
-            "Filtrar por estado",
+        especialidade = st.text_input(
+            "Especialidade"
+        )
+
+        estado = st.text_input(
+            "Estado"
+        )
+
+        cidade = st.text_input(
+            "Cidade"
+        )
+
+        telefone = st.text_input(
+            "Telefone"
+        )
+
+        email = st.text_input(
+            "Email"
+        )
+
+        disponibilidade = st.selectbox(
+            "Disponibilidade",
             [
-                "Todos",
-                "PR",
-                "SP",
-                "SC",
-                "RS",
-                "MG",
-                "RJ"
+                "Imediata",
+                "Parcial",
+                "Plantões",
+                "CLT",
+                "PJ"
             ]
         )
 
-        busca = st.text_input(
-            "Buscar por nome, cidade ou especialidade"
+        salvar = st.form_submit_button(
+            "💾 Salvar profissional"
         )
 
-        resultados = profissionais
+        if salvar:
 
-        if filtro_profissao != "Todos":
-            resultados = [
-                p for p in resultados
-                if p["profissao"] == filtro_profissao
-            ]
+            salvar_profissional(
+                nome,
+                profissao,
+                especialidade,
+                estado,
+                cidade,
+                telefone,
+                email,
+                disponibilidade
+            )
 
-        if filtro_estado != "Todos":
-            resultados = [
-                p for p in resultados
-                if p["estado"] == filtro_estado
-            ]
+            st.success("Profissional salvo com sucesso!")
 
-        if busca:
-            termo = busca.lower()
+    st.divider()
 
-            resultados = [
-                p for p in resultados
-                if termo in str(p.get("nome", "")).lower()
-                or termo in str(p.get("cidade", "")).lower()
-                or termo in str(p.get("especialidade", "")).lower()
-            ]
+    st.subheader("Profissionais cadastrados")
 
-        st.write(f"Profissionais encontrados: {len(resultados)}")
+    profissionais = buscar_profissionais()
 
-        for p in resultados:
+    if not profissionais:
 
-            with st.container(border=True):
+        st.warning("Nenhum profissional cadastrado.")
 
-                st.subheader(f"👤 {p['nome']}")
+    else:
 
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    st.write(f"**Profissão:** {p['profissao']}")
-                    st.write(f"**Especialidade:** {p['especialidade']}")
-                    st.write(f"**Local:** {p['cidade']}/{p['estado']}")
-                    st.write(f"**Disponibilidade:** {p['disponibilidade']}")
-
-                with col2:
-                    st.write(f"**Telefone:** {p['telefone']}")
-                    st.write(f"**E-mail:** {p['email']}")
-                    st.write(f"**Valor:** {p['valor_plantao']}")
-
-                st.write("**Experiência:**")
-                st.write(p["experiencia"])
+        for item in profissionais:
+            card_profissional(item)
