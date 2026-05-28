@@ -1,14 +1,16 @@
 import streamlit as st
+import plotly.graph_objects as go
+from collections import Counter
 
 from auth import inicializar_sessao, tela_login, logout
-from database import buscar_historico
+from database import buscar_historico, buscar_oportunidades, supabase
 from analyzer import analisar_edital
 from pdf_generator import gerar_pdf
 from styles import aplicar_estilo
 from opportunities import tela_oportunidades
 from saved_opportunities import tela_oportunidades_salvas
 from alerts import tela_alertas
-from professionals import tela_profissionais
+from professionals import tela_profissionais, buscar_profissionais
 
 
 st.set_page_config(
@@ -25,6 +27,76 @@ if st.session_state.user is None:
 
 user_email = st.session_state.user
 historico = buscar_historico(user_email)
+
+
+def buscar_alertas_total(user_email):
+    try:
+        response = (
+            supabase
+            .table("alerts")
+            .select("*")
+            .eq("user_email", user_email)
+            .execute()
+        )
+
+        return response.data if response.data else []
+
+    except Exception:
+        return []
+
+
+def extrair_estado(local):
+    if not local:
+        return "Não informado"
+
+    if "/" in local:
+        return local.split("/")[-1].strip()
+
+    return "Não informado"
+
+
+def grafico_pizza(titulo, labels, values):
+    fig = go.Figure(
+        data=[
+            go.Pie(
+                labels=labels,
+                values=values,
+                hole=0.45
+            )
+        ]
+    )
+
+    fig.update_layout(
+        title=titulo,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="white"),
+        height=360
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def grafico_barras(titulo, labels, values):
+    fig = go.Figure(
+        data=[
+            go.Bar(
+                x=labels,
+                y=values
+            )
+        ]
+    )
+
+    fig.update_layout(
+        title=titulo,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="white"),
+        height=360
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
 
 with st.sidebar:
     st.markdown("## 🏥 CredMed IA")
@@ -61,6 +133,31 @@ with st.sidebar:
 
 if pagina == "Painel":
 
+    oportunidades = buscar_oportunidades()
+    profissionais = buscar_profissionais()
+    alertas = buscar_alertas_total(user_email)
+
+    total_oportunidades = len(oportunidades)
+    total_profissionais = len(profissionais)
+    total_alertas = len(alertas)
+
+    credenciamentos = [
+        item for item in oportunidades
+        if str(item.get("tipo", "")).lower() == "credenciamento"
+    ]
+
+    licitacoes = [
+        item for item in oportunidades
+        if str(item.get("tipo", "")).lower() == "licitação"
+        or str(item.get("tipo", "")).lower() == "licitacao"
+    ]
+
+    excelentes = [
+        item for item in oportunidades
+        if "excelente" in str(item.get("relevancia", "")).lower()
+        or "muito boa" in str(item.get("relevancia", "")).lower()
+    ]
+
     st.markdown("""
     <div class="hero">
         <h1>🏥 CredMed IA</h1>
@@ -76,34 +173,116 @@ if pagina == "Painel":
     with col1:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-title">Análises feitas</div>
-            <div class="metric-value">{len(historico)}</div>
+            <div class="metric-title">Oportunidades</div>
+            <div class="metric-value">{total_oportunidades}</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col2:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-title">Plano atual</div>
-            <div class="metric-value">FREE</div>
+            <div class="metric-title">Profissionais</div>
+            <div class="metric-value">{total_profissionais}</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col3:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-title">Radar PNCP</div>
-            <div class="metric-value">ON</div>
+            <div class="metric-title">Alertas ativos</div>
+            <div class="metric-value">{total_alertas}</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col4:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-title">Marketplace</div>
-            <div class="metric-value">BETA</div>
+            <div class="metric-title">Alta relevância</div>
+            <div class="metric-value">{len(excelentes)}</div>
         </div>
         """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="card">
+        <h2>📊 Inteligência de Mercado</h2>
+        <p>
+        Visão executiva das oportunidades capturadas, profissionais cadastrados
+        e movimentação da plataforma.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    g1, g2 = st.columns(2)
+
+    with g1:
+        grafico_pizza(
+            "Credenciamentos x Licitações",
+            ["Credenciamentos", "Licitações", "Outros"],
+            [
+                len(credenciamentos),
+                len(licitacoes),
+                max(total_oportunidades - len(credenciamentos) - len(licitacoes), 0)
+            ]
+        )
+
+    with g2:
+        relevancias = [
+            str(item.get("relevancia", "Não informado"))
+            for item in oportunidades
+        ]
+
+        contagem_relevancia = Counter(relevancias)
+
+        if contagem_relevancia:
+            grafico_barras(
+                "Oportunidades por relevância",
+                list(contagem_relevancia.keys()),
+                list(contagem_relevancia.values())
+            )
+        else:
+            st.info("Ainda não há dados suficientes para o gráfico de relevância.")
+
+    g3, g4 = st.columns(2)
+
+    with g3:
+        estados = [
+            extrair_estado(item.get("local", ""))
+            for item in oportunidades
+        ]
+
+        contagem_estados = Counter(estados)
+
+        top_estados = contagem_estados.most_common(8)
+
+        if top_estados:
+            grafico_barras(
+                "Estados com mais oportunidades",
+                [x[0] for x in top_estados],
+                [x[1] for x in top_estados]
+            )
+        else:
+            st.info("Ainda não há dados suficientes para o gráfico por estado.")
+
+    with g4:
+        profissoes = [
+            str(item.get("profissao", "Não informado"))
+            for item in profissionais
+        ]
+
+        contagem_profissoes = Counter(profissoes)
+
+        top_profissoes = contagem_profissoes.most_common(8)
+
+        if top_profissoes:
+            grafico_barras(
+                "Profissões cadastradas",
+                [x[0] for x in top_profissoes],
+                [x[1] for x in top_profissoes]
+            )
+        else:
+            st.info("Ainda não há profissionais suficientes para gráfico.")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
