@@ -40,7 +40,6 @@ def buscar_profissionais():
 
 def card_profissional(item):
     with st.container(border=True):
-
         st.markdown(
             f"""
             ### 👨‍⚕️ {item.get("nome", "Profissional")}
@@ -62,16 +61,14 @@ def card_profissional(item):
         )
 
 
-def tela_marketplace_profissional():
-
+def tela_profissionais():
     st.title("🏥 Marketplace Profissional")
 
     st.write(
-        "Cadastre profissionais da saúde para oportunidades e credenciamentos."
+        "Cadastre profissionais da saúde para oportunidades, credenciamentos e licitações."
     )
 
     with st.form("cadastro_profissional"):
-
         nome = st.text_input("Nome completo")
 
         profissao = st.selectbox(
@@ -89,25 +86,11 @@ def tela_marketplace_profissional():
             ]
         )
 
-        especialidade = st.text_input(
-            "Especialidade"
-        )
-
-        estado = st.text_input(
-            "Estado"
-        )
-
-        cidade = st.text_input(
-            "Cidade"
-        )
-
-        telefone = st.text_input(
-            "Telefone"
-        )
-
-        email = st.text_input(
-            "Email"
-        )
+        especialidade = st.text_input("Especialidade")
+        estado = st.text_input("Estado")
+        cidade = st.text_input("Cidade")
+        telefone = st.text_input("Telefone")
+        email = st.text_input("Email")
 
         disponibilidade = st.selectbox(
             "Disponibilidade",
@@ -120,12 +103,9 @@ def tela_marketplace_profissional():
             ]
         )
 
-        salvar = st.form_submit_button(
-            "💾 Salvar profissional"
-        )
+        salvar = st.form_submit_button("💾 Salvar profissional")
 
         if salvar:
-
             salvar_profissional(
                 nome,
                 profissao,
@@ -146,10 +126,7 @@ def tela_marketplace_profissional():
     profissionais = buscar_profissionais()
 
     if not profissionais:
-
         st.warning("Nenhum profissional cadastrado.")
-
     else:
-
         for item in profissionais:
             card_profissional(item)
