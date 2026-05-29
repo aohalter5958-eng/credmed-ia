@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 from database import supabase
 
@@ -18,7 +19,48 @@ def buscar_profissionais():
 
     return response.data if response.data else []
 
+
+def limpar_telefone(telefone):
+    if not telefone:
+        return ""
+
+    numero = re.sub(r"\D", "", telefone)
+
+    if numero.startswith("55"):
+        return numero
+
+    return "55" + numero
+
+
+def gerar_link_whatsapp(telefone, nome):
+    numero = limpar_telefone(telefone)
+
+    mensagem = (
+        f"Olá, {nome}. Encontrei seu perfil no CredMed IA "
+        f"e gostaria de conversar sobre uma oportunidade na área da saúde."
+    )
+
+    return f"https://wa.me/{numero}?text={mensagem}"
+
+
+def gerar_link_email(email, nome):
+    assunto = "Oportunidade profissional - CredMed IA"
+
+    corpo = (
+        f"Olá, {nome}.\n\n"
+        f"Encontrei seu perfil no CredMed IA e gostaria de conversar "
+        f"sobre uma oportunidade na área da saúde.\n\n"
+        f"Aguardo seu retorno."
+    )
+
+    return f"mailto:{email}?subject={assunto}&body={corpo}"
+
+
 def card_profissional(item):
+    nome = item.get("nome", "Profissional")
+    telefone = item.get("telefone", "")
+    email = item.get("email", "")
+
     st.markdown(
         f"""
         <div style="
@@ -30,8 +72,10 @@ def card_profissional(item):
         ">
 
         <h2 style="color:white;">
-            👨‍⚕️ {item.get("nome", "Profissional")}
+            👨‍⚕️ {nome}
         </h2>
+
+        <p><b>Status:</b> ✅ Profissional verificado</p>
 
         <p><b>Profissão:</b> {item.get("profissao", "-")}</p>
 
@@ -57,14 +101,30 @@ def card_profissional(item):
 
         <p><b>Currículo:</b> {item.get("curriculo", "-")}</p>
 
-        <p><b>Telefone:</b> {item.get("telefone", "-")}</p>
+        <p><b>Telefone:</b> {telefone}</p>
 
-        <p><b>Email:</b> {item.get("email", "-")}</p>
+        <p><b>Email:</b> {email}</p>
 
         </div>
         """,
         unsafe_allow_html=True
     )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if telefone:
+            st.link_button(
+                "📱 Chamar no WhatsApp",
+                gerar_link_whatsapp(telefone, nome)
+            )
+
+    with col2:
+        if email:
+            st.link_button(
+                "📧 Enviar Email",
+                gerar_link_email(email, nome)
+            )
 
 
 def tela_profissionais():
@@ -107,7 +167,10 @@ def tela_profissionais():
 
         cidade = st.text_input("Cidade")
 
-        telefone = st.text_input("Telefone")
+        telefone = st.text_input(
+            "Telefone/WhatsApp",
+            placeholder="Ex: 44999999999"
+        )
 
         email = st.text_input("Email")
 
@@ -163,12 +226,16 @@ def tela_profissionais():
                 "valor_plantao": valor_plantao,
                 "experiencia": experiencia,
                 "palavras_chave": palavras_chave,
-                "curriculo": curriculo
+                "curriculo": curriculo,
+                "status_verificacao": "pendente"
             }
 
             salvar_profissional(dados)
 
-            st.success("✅ Profissional salvo com sucesso!")
+            st.success(
+                "✅ Cadastro enviado com sucesso! "
+                "O profissional ficará pendente até validação administrativa."
+            )
 
     st.divider()
 
