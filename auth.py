@@ -1,5 +1,9 @@
 import streamlit as st
 from database import supabase
+from streamlit_cookies_controller import CookieController
+
+
+cookie_controller = CookieController()
 
 
 def login_usuario(email, senha):
@@ -23,6 +27,12 @@ def inicializar_sessao():
     if "resultado_antigo" not in st.session_state:
         st.session_state.resultado_antigo = None
 
+    if st.session_state.user is None:
+        email_salvo = cookie_controller.get("credmed_user_email")
+
+        if email_salvo:
+            st.session_state.user = email_salvo
+
 
 def tela_login():
     st.markdown("""
@@ -40,11 +50,25 @@ def tela_login():
         login_email = st.text_input("E-mail", key="login_email")
         login_password = st.text_input("Senha", type="password", key="login_password")
 
+        lembrar_login = st.checkbox(
+            "Manter-me conectado neste navegador",
+            value=True
+        )
+
         if st.button("Entrar"):
             try:
                 response = login_usuario(login_email, login_password)
+
                 st.session_state.user = response.user.email
+
+                if lembrar_login:
+                    cookie_controller.set(
+                        "credmed_user_email",
+                        response.user.email
+                    )
+
                 st.rerun()
+
             except Exception:
                 st.error("Email ou senha inválidos")
 
@@ -67,4 +91,10 @@ def tela_login():
 def logout():
     st.session_state.user = None
     st.session_state.resultado_antigo = None
+
+    try:
+        cookie_controller.remove("credmed_user_email")
+    except Exception:
+        pass
+
     st.rerun()
