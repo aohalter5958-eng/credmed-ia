@@ -1,6 +1,6 @@
 import re
 import streamlit as st
-from database import supabase
+from database import supabase, upload_curriculo_pdf
 
 
 def salvar_profissional(dados):
@@ -60,6 +60,7 @@ def card_profissional(item):
     nome = item.get("nome", "Profissional")
     telefone = item.get("telefone", "")
     email = item.get("email", "")
+    curriculo_pdf = item.get("curriculo_pdf", "")
 
     st.markdown(
         f"""
@@ -99,7 +100,7 @@ def card_profissional(item):
 
         <p><b>Palavras-chave:</b> {item.get("palavras_chave", "-")}</p>
 
-        <p><b>Currículo:</b> {item.get("curriculo", "-")}</p>
+        <p><b>Currículo resumido:</b> {item.get("curriculo", "-")}</p>
 
         <p><b>Telefone:</b> {telefone}</p>
 
@@ -110,21 +111,26 @@ def card_profissional(item):
         unsafe_allow_html=True
     )
 
-    col1, col2 = st.columns(2)
+    if curriculo_pdf:
+        st.link_button(
+            "📄 Baixar currículo PDF",
+            curriculo_pdf,
+            use_container_width=True
+        )
 
-    with col1:
-        if telefone:
-            st.link_button(
-                "📱 Chamar no WhatsApp",
-                gerar_link_whatsapp(telefone, nome)
-            )
+    if telefone:
+        st.link_button(
+            "📱 Chamar no WhatsApp",
+            gerar_link_whatsapp(telefone, nome),
+            use_container_width=True
+        )
 
-    with col2:
-        if email:
-            st.link_button(
-                "📧 Enviar Email",
-                gerar_link_email(email, nome)
-            )
+    if email:
+        st.link_button(
+            "📧 Enviar Email",
+            gerar_link_email(email, nome),
+            use_container_width=True
+        )
 
 
 def tela_profissionais():
@@ -205,11 +211,24 @@ def tela_profissionais():
             "Resumo do currículo"
         )
 
+        arquivo_curriculo = st.file_uploader(
+            "Anexar currículo em PDF",
+            type=["pdf"]
+        )
+
         salvar = st.form_submit_button(
             "💾 Salvar profissional"
         )
 
         if salvar:
+
+            curriculo_pdf_url = None
+
+            if arquivo_curriculo is not None:
+                curriculo_pdf_url = upload_curriculo_pdf(
+                    arquivo_curriculo,
+                    nome
+                )
 
             dados = {
                 "nome": nome,
@@ -227,6 +246,7 @@ def tela_profissionais():
                 "experiencia": experiencia,
                 "palavras_chave": palavras_chave,
                 "curriculo": curriculo,
+                "curriculo_pdf": curriculo_pdf_url,
                 "status_verificacao": "pendente"
             }
 
