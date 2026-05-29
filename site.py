@@ -11,6 +11,12 @@ from opportunities import tela_oportunidades
 from saved_opportunities import tela_oportunidades_salvas
 from alerts import tela_alertas
 from professionals import tela_profissionais, buscar_profissionais
+from admin import tela_admin_profissionais
+
+
+ADMIN_EMAILS = [
+    "aohalter5958@gmail.com"
+]
 
 
 st.set_page_config(
@@ -24,6 +30,7 @@ inicializar_sessao()
 
 if st.session_state.user is None:
     tela_login()
+    st.stop()
 
 user_email = st.session_state.user
 historico = buscar_historico(user_email)
@@ -38,9 +45,21 @@ def buscar_alertas_total(user_email):
             .eq("user_email", user_email)
             .execute()
         )
-
         return response.data if response.data else []
+    except Exception:
+        return []
 
+
+def buscar_profissionais_pendentes():
+    try:
+        response = (
+            supabase
+            .table("profissionais")
+            .select("*")
+            .eq("status_verificacao", "pendente")
+            .execute()
+        )
+        return response.data if response.data else []
     except Exception:
         return []
 
@@ -102,15 +121,20 @@ with st.sidebar:
     st.markdown("## 🏥 CredMed IA")
     st.success(f"Logado como:\n\n{user_email}")
 
+    paginas = [
+        "Painel",
+        "Radar de Oportunidades",
+        "Base Inteligente",
+        "Meus Alertas",
+        "Marketplace Profissional"
+    ]
+
+    if user_email in ADMIN_EMAILS:
+        paginas.append("Painel Admin")
+
     pagina = st.radio(
         "Navegação",
-        [
-            "Painel",
-            "Radar de Oportunidades",
-            "Base Inteligente",
-            "Meus Alertas",
-            "Marketplace Profissional"
-        ]
+        paginas
     )
 
     if st.button("Sair"):
@@ -124,7 +148,10 @@ with st.sidebar:
             with st.expander(f"📄 {item['nome_arquivo'][:28]}"):
                 st.caption(item["criado_em"])
 
-                if st.button(f"Abrir análise {item['id']}", key=f"abrir_{item['id']}"):
+                if st.button(
+                    f"Abrir análise {item['id']}",
+                    key=f"abrir_{item['id']}"
+                ):
                     st.session_state.resultado_antigo = item["resultado"]
                     st.rerun()
     else:
@@ -136,10 +163,12 @@ if pagina == "Painel":
     oportunidades = buscar_oportunidades()
     profissionais = buscar_profissionais()
     alertas = buscar_alertas_total(user_email)
+    pendentes = buscar_profissionais_pendentes()
 
     total_oportunidades = len(oportunidades)
     total_profissionais = len(profissionais)
     total_alertas = len(alertas)
+    total_pendentes = len(pendentes)
 
     credenciamentos = [
         item for item in oportunidades
@@ -148,8 +177,7 @@ if pagina == "Painel":
 
     licitacoes = [
         item for item in oportunidades
-        if str(item.get("tipo", "")).lower() == "licitação"
-        or str(item.get("tipo", "")).lower() == "licitacao"
+        if str(item.get("tipo", "")).lower() in ["licitação", "licitacao"]
     ]
 
     excelentes = [
@@ -202,6 +230,19 @@ if pagina == "Painel":
         </div>
         """, unsafe_allow_html=True)
 
+    if user_email in ADMIN_EMAILS:
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div class="card">
+            <h2>🛡️ Controle Administrativo</h2>
+            <p>
+            Profissionais aguardando verificação manual:
+            <strong>{total_pendentes}</strong>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
     st.markdown("<br>", unsafe_allow_html=True)
 
     st.markdown("""
@@ -223,7 +264,12 @@ if pagina == "Painel":
             [
                 len(credenciamentos),
                 len(licitacoes),
-                max(total_oportunidades - len(credenciamentos) - len(licitacoes), 0)
+                max(
+                    total_oportunidades
+                    - len(credenciamentos)
+                    - len(licitacoes),
+                    0
+                )
             ]
         )
 
@@ -242,7 +288,7 @@ if pagina == "Painel":
                 list(contagem_relevancia.values())
             )
         else:
-            st.info("Ainda não há dados suficientes para o gráfico de relevância.")
+            st.info("Ainda não há dados suficientes para relevância.")
 
     g3, g4 = st.columns(2)
 
@@ -253,7 +299,6 @@ if pagina == "Painel":
         ]
 
         contagem_estados = Counter(estados)
-
         top_estados = contagem_estados.most_common(8)
 
         if top_estados:
@@ -263,7 +308,7 @@ if pagina == "Painel":
                 [x[1] for x in top_estados]
             )
         else:
-            st.info("Ainda não há dados suficientes para o gráfico por estado.")
+            st.info("Ainda não há dados suficientes por estado.")
 
     with g4:
         profissoes = [
@@ -272,7 +317,6 @@ if pagina == "Painel":
         ]
 
         contagem_profissoes = Counter(profissoes)
-
         top_profissoes = contagem_profissoes.most_common(8)
 
         if top_profissoes:
@@ -375,3 +419,9 @@ elif pagina == "Meus Alertas":
 
 elif pagina == "Marketplace Profissional":
     tela_profissionais()
+
+elif pagina == "Painel Admin":
+    if user_email in ADMIN_EMAILS:
+        tela_admin_profissionais(user_email)
+    else:
+        st.error("Acesso negado.")
