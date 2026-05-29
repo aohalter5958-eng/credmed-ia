@@ -1,9 +1,5 @@
 import streamlit as st
 from database import supabase
-from streamlit_cookies_controller import CookieController
-
-
-cookie_controller = CookieController()
 
 
 def login_usuario(email, senha):
@@ -20,6 +16,34 @@ def cadastrar_usuario(email, senha):
     })
 
 
+def pegar_usuario_da_url():
+    try:
+        email = st.query_params.get("user")
+
+        if isinstance(email, list):
+            return email[0]
+
+        return email
+
+    except Exception:
+        return None
+
+
+def salvar_usuario_na_url(email):
+    try:
+        st.query_params["user"] = email
+    except Exception:
+        pass
+
+
+def limpar_usuario_da_url():
+    try:
+        if "user" in st.query_params:
+            del st.query_params["user"]
+    except Exception:
+        pass
+
+
 def inicializar_sessao():
     if "user" not in st.session_state:
         st.session_state.user = None
@@ -28,10 +52,10 @@ def inicializar_sessao():
         st.session_state.resultado_antigo = None
 
     if st.session_state.user is None:
-        email_salvo = cookie_controller.get("credmed_user_email")
+        email_url = pegar_usuario_da_url()
 
-        if email_salvo:
-            st.session_state.user = email_salvo
+        if email_url:
+            st.session_state.user = email_url
 
 
 def tela_login():
@@ -62,10 +86,7 @@ def tela_login():
                 st.session_state.user = response.user.email
 
                 if lembrar_login:
-                    cookie_controller.set(
-                        "credmed_user_email",
-                        response.user.email
-                    )
+                    salvar_usuario_na_url(response.user.email)
 
                 st.rerun()
 
@@ -92,9 +113,6 @@ def logout():
     st.session_state.user = None
     st.session_state.resultado_antigo = None
 
-    try:
-        cookie_controller.remove("credmed_user_email")
-    except Exception:
-        pass
+    limpar_usuario_da_url()
 
     st.rerun()
