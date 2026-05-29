@@ -7,6 +7,10 @@ def salvar_profissional(dados):
     supabase.table("profissionais").insert(dados).execute()
 
 
+def atualizar_profissional(profissional_id, dados):
+    supabase.table("profissionais").update(dados).eq("id", profissional_id).execute()
+
+
 def buscar_profissionais():
     response = (
         supabase
@@ -18,6 +22,23 @@ def buscar_profissionais():
     )
 
     return response.data if response.data else []
+
+
+def buscar_meu_perfil(user_email):
+    response = (
+        supabase
+        .table("profissionais")
+        .select("*")
+        .eq("user_email", user_email)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if response.data:
+        return response.data[0]
+
+    return None
 
 
 def limpar_telefone(telefone):
@@ -72,38 +93,22 @@ def card_profissional(item):
             border:1px solid rgba(255,255,255,0.08);
         ">
 
-        <h2 style="color:white;">
-            👨‍⚕️ {nome}
-        </h2>
+        <h2 style="color:white;">👨‍⚕️ {nome}</h2>
 
         <p><b>Status:</b> ✅ Profissional verificado</p>
-
         <p><b>Profissão:</b> {item.get("profissao", "-")}</p>
-
         <p><b>Especialidade:</b> {item.get("especialidade", "-")}</p>
-
         <p><b>Conselho:</b> {item.get("conselho", "-")}</p>
-
         <p><b>Registro:</b> {item.get("numero_registro", "-")}</p>
-
         <p><b>Estado:</b> {item.get("estado", "-")}</p>
-
         <p><b>Cidade:</b> {item.get("cidade", "-")}</p>
-
         <p><b>Disponibilidade:</b> {item.get("disponibilidade", "-")}</p>
-
         <p><b>Tipos contrato:</b> {item.get("tipos_contrato", "-")}</p>
-
         <p><b>Valor plantão:</b> {item.get("valor_plantao", "-")}</p>
-
         <p><b>Experiência:</b> {item.get("experiencia", "-")}</p>
-
         <p><b>Palavras-chave:</b> {item.get("palavras_chave", "-")}</p>
-
         <p><b>Currículo resumido:</b> {item.get("curriculo", "-")}</p>
-
         <p><b>Telefone:</b> {telefone}</p>
-
         <p><b>Email:</b> {email}</p>
 
         </div>
@@ -133,133 +138,245 @@ def card_profissional(item):
         )
 
 
-def tela_profissionais():
-    st.title("🏥 Marketplace Profissional")
+def formulario_profissional(dados_existentes=None):
+    if dados_existentes is None:
+        dados_existentes = {}
 
-    st.write(
-        "Cadastre profissionais da saúde para credenciamentos e oportunidades."
+    nome = st.text_input(
+        "Nome completo",
+        value=dados_existentes.get("nome", "")
     )
 
-    with st.form("cadastro_profissional"):
+    opcoes_profissao = [
+        "Médico",
+        "Enfermeiro",
+        "Fisioterapeuta",
+        "Psicólogo",
+        "Farmacêutico",
+        "Biomédico",
+        "Dentista",
+        "Técnico de Enfermagem",
+        "Outro"
+    ]
 
-        nome = st.text_input("Nome completo")
+    profissao_atual = dados_existentes.get("profissao", "Enfermeiro")
 
-        profissao = st.selectbox(
-            "Profissão",
-            [
-                "Médico",
-                "Enfermeiro",
-                "Fisioterapeuta",
-                "Psicólogo",
-                "Farmacêutico",
-                "Biomédico",
-                "Dentista",
-                "Técnico de Enfermagem",
-                "Outro"
-            ]
-        )
+    if profissao_atual not in opcoes_profissao:
+        profissao_atual = "Outro"
 
-        especialidade = st.text_input("Especialidade")
+    profissao = st.selectbox(
+        "Profissão",
+        opcoes_profissao,
+        index=opcoes_profissao.index(profissao_atual)
+    )
 
-        conselho = st.text_input(
-            "Conselho profissional (CRM, COREN, etc)"
-        )
+    especialidade = st.text_input(
+        "Especialidade",
+        value=dados_existentes.get("especialidade", "")
+    )
 
-        numero_registro = st.text_input(
-            "Número do registro profissional"
-        )
+    conselho = st.text_input(
+        "Conselho profissional (CRM, COREN, etc)",
+        value=dados_existentes.get("conselho", "")
+    )
 
-        estado = st.text_input("Estado")
+    numero_registro = st.text_input(
+        "Número do registro profissional",
+        value=dados_existentes.get("numero_registro", "")
+    )
 
-        cidade = st.text_input("Cidade")
+    estado = st.text_input(
+        "Estado",
+        value=dados_existentes.get("estado", "")
+    )
 
-        telefone = st.text_input(
-            "Telefone/WhatsApp",
-            placeholder="Ex: 44999999999"
-        )
+    cidade = st.text_input(
+        "Cidade",
+        value=dados_existentes.get("cidade", "")
+    )
 
-        email = st.text_input("Email")
+    telefone = st.text_input(
+        "Telefone/WhatsApp",
+        value=dados_existentes.get("telefone", ""),
+        placeholder="Ex: 44999999999"
+    )
 
-        disponibilidade = st.selectbox(
-            "Disponibilidade",
-            [
-                "Imediata",
-                "Plantões",
-                "PJ",
-                "CLT",
-                "Parcial"
-            ]
-        )
+    email = st.text_input(
+        "Email",
+        value=dados_existentes.get("email", "")
+    )
 
-        tipos_contrato = st.text_input(
-            "Tipos de contrato"
-        )
+    opcoes_disponibilidade = [
+        "Imediata",
+        "Plantões",
+        "PJ",
+        "CLT",
+        "Parcial"
+    ]
 
-        valor_plantao = st.text_input(
-            "Valor médio do plantão"
-        )
+    disponibilidade_atual = dados_existentes.get(
+        "disponibilidade",
+        "Imediata"
+    )
 
-        experiencia = st.text_area(
-            "Experiência profissional"
-        )
+    if disponibilidade_atual not in opcoes_disponibilidade:
+        disponibilidade_atual = "Imediata"
 
-        palavras_chave = st.text_input(
-            "Palavras-chave"
-        )
+    disponibilidade = st.selectbox(
+        "Disponibilidade",
+        opcoes_disponibilidade,
+        index=opcoes_disponibilidade.index(disponibilidade_atual)
+    )
 
-        curriculo = st.text_area(
-            "Resumo do currículo"
-        )
+    tipos_contrato = st.text_input(
+        "Tipos de contrato",
+        value=dados_existentes.get("tipos_contrato", "")
+    )
 
-        arquivo_curriculo = st.file_uploader(
-            "Anexar currículo em PDF",
-            type=["pdf"]
-        )
+    valor_plantao = st.text_input(
+        "Valor médio do plantão",
+        value=dados_existentes.get("valor_plantao", "")
+    )
 
-        salvar = st.form_submit_button(
-            "💾 Salvar profissional"
-        )
+    experiencia = st.text_area(
+        "Experiência profissional",
+        value=dados_existentes.get("experiencia", "")
+    )
+
+    palavras_chave = st.text_input(
+        "Palavras-chave",
+        value=dados_existentes.get("palavras_chave", "")
+    )
+
+    curriculo = st.text_area(
+        "Resumo do currículo",
+        value=dados_existentes.get("curriculo", "")
+    )
+
+    arquivo_curriculo = st.file_uploader(
+        "Anexar/Atualizar currículo em PDF",
+        type=["pdf"]
+    )
+
+    return {
+        "nome": nome,
+        "profissao": profissao,
+        "especialidade": especialidade,
+        "conselho": conselho,
+        "numero_registro": numero_registro,
+        "estado": estado,
+        "cidade": cidade,
+        "telefone": telefone,
+        "email": email,
+        "disponibilidade": disponibilidade,
+        "tipos_contrato": tipos_contrato,
+        "valor_plantao": valor_plantao,
+        "experiencia": experiencia,
+        "palavras_chave": palavras_chave,
+        "curriculo": curriculo,
+        "arquivo_curriculo": arquivo_curriculo
+    }
+
+
+def tela_meu_perfil(user_email):
+    st.title("👤 Meu Perfil Profissional")
+
+    st.write(
+        "Cadastre ou atualize suas informações profissionais. "
+        "Toda alteração voltará para análise administrativa."
+    )
+
+    perfil = buscar_meu_perfil(user_email)
+
+    if perfil:
+        status = perfil.get("status_verificacao", "pendente")
+
+        if status == "verificado":
+            st.success("✅ Seu perfil está verificado e visível no Marketplace.")
+        elif status == "pendente":
+            st.warning("🟡 Seu perfil está aguardando verificação administrativa.")
+        elif status == "recusado":
+            st.error("🔴 Seu perfil foi recusado. Atualize as informações e envie novamente.")
+        else:
+            st.info(f"Status atual: {status}")
+
+        curriculo_pdf = perfil.get("curriculo_pdf")
+
+        if curriculo_pdf:
+            st.link_button(
+                "📄 Ver currículo PDF atual",
+                curriculo_pdf,
+                use_container_width=True
+            )
+
+    else:
+        st.info("Você ainda não possui perfil profissional cadastrado.")
+
+    with st.form("form_meu_perfil"):
+
+        dados_form = formulario_profissional(perfil)
+
+        salvar = st.form_submit_button("💾 Salvar meu perfil")
 
         if salvar:
 
-            curriculo_pdf_url = None
+            curriculo_pdf_url = perfil.get("curriculo_pdf") if perfil else None
 
-            if arquivo_curriculo is not None:
+            if dados_form["arquivo_curriculo"] is not None:
                 curriculo_pdf_url = upload_curriculo_pdf(
-                    arquivo_curriculo,
-                    nome
+                    dados_form["arquivo_curriculo"],
+                    dados_form["nome"]
                 )
 
             dados = {
-                "nome": nome,
-                "profissao": profissao,
-                "especialidade": especialidade,
-                "conselho": conselho,
-                "numero_registro": numero_registro,
-                "estado": estado,
-                "cidade": cidade,
-                "telefone": telefone,
-                "email": email,
-                "disponibilidade": disponibilidade,
-                "tipos_contrato": tipos_contrato,
-                "valor_plantao": valor_plantao,
-                "experiencia": experiencia,
-                "palavras_chave": palavras_chave,
-                "curriculo": curriculo,
+                "user_email": user_email,
+                "nome": dados_form["nome"],
+                "profissao": dados_form["profissao"],
+                "especialidade": dados_form["especialidade"],
+                "conselho": dados_form["conselho"],
+                "numero_registro": dados_form["numero_registro"],
+                "estado": dados_form["estado"],
+                "cidade": dados_form["cidade"],
+                "telefone": dados_form["telefone"],
+                "email": dados_form["email"],
+                "disponibilidade": dados_form["disponibilidade"],
+                "tipos_contrato": dados_form["tipos_contrato"],
+                "valor_plantao": dados_form["valor_plantao"],
+                "experiencia": dados_form["experiencia"],
+                "palavras_chave": dados_form["palavras_chave"],
+                "curriculo": dados_form["curriculo"],
                 "curriculo_pdf": curriculo_pdf_url,
                 "status_verificacao": "pendente"
             }
 
-            salvar_profissional(dados)
+            if perfil:
+                atualizar_profissional(
+                    perfil.get("id"),
+                    dados
+                )
 
-            st.success(
-                "✅ Cadastro enviado com sucesso! "
-                "O profissional ficará pendente até validação administrativa."
-            )
+                st.success(
+                    "✅ Perfil atualizado com sucesso! "
+                    "Ele voltou para análise administrativa."
+                )
 
-    st.divider()
+            else:
+                salvar_profissional(dados)
 
-    st.subheader("Profissionais cadastrados")
+                st.success(
+                    "✅ Perfil criado com sucesso! "
+                    "Ele ficará pendente até validação administrativa."
+                )
+
+            st.rerun()
+
+
+def tela_profissionais(user_email=None):
+    st.title("🏥 Marketplace Profissional")
+
+    st.write(
+        "Profissionais verificados da saúde disponíveis para credenciamentos e oportunidades."
+    )
 
     profissionais = buscar_profissionais()
 
