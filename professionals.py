@@ -11,6 +11,7 @@ def buscar_profissionais():
         supabase
         .table("profissionais")
         .select("*")
+        .eq("status_verificacao", "aprovado")
         .order("created_at", desc=True)
         .execute()
     )
