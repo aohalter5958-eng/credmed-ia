@@ -1,5 +1,6 @@
 import os
 import hashlib
+import time
 import streamlit as st
 from dotenv import load_dotenv
 from supabase import create_client
@@ -32,7 +33,7 @@ def buscar_historico(user_email):
         .order("id", desc=True)
         .execute()
     )
-    return response.data
+    return response.data if response.data else []
 
 
 def gerar_hash_oportunidade(item):
@@ -94,4 +95,44 @@ def buscar_oportunidades():
         .limit(200)
         .execute()
     )
-    return response.data
+    return response.data if response.data else []
+
+
+def upload_curriculo_pdf(arquivo, nome_profissional):
+    try:
+        if arquivo is None:
+            return None
+
+        nome_limpo = (
+            nome_profissional
+            .lower()
+            .replace(" ", "_")
+            .replace("/", "_")
+            .replace("\\", "_")
+        )
+
+        timestamp = int(time.time())
+
+        caminho_arquivo = f"{nome_limpo}_{timestamp}.pdf"
+
+        conteudo = arquivo.getvalue()
+
+        supabase.storage.from_("curriculos").upload(
+            caminho_arquivo,
+            conteudo,
+            {
+                "content-type": "application/pdf",
+                "upsert": "true"
+            }
+        )
+
+        url_publica = supabase.storage.from_("curriculos").get_public_url(
+            caminho_arquivo
+        )
+
+        return url_publica
+
+    except Exception as erro:
+        print("Erro ao fazer upload do currículo:")
+        print(erro)
+        return None
