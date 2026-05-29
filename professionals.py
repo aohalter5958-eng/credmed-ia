@@ -11,13 +11,12 @@ def buscar_profissionais():
         supabase
         .table("profissionais")
         .select("*")
-        .eq("status_verificacao", "aprovado")
+        .eq("status_verificacao", "verificado")
         .order("created_at", desc=True)
         .execute()
     )
 
     return response.data if response.data else []
-
 
 def card_profissional(item):
     st.markdown(
