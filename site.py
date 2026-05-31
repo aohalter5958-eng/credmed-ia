@@ -10,7 +10,7 @@ from styles import aplicar_estilo
 from opportunities import tela_oportunidades
 from saved_opportunities import tela_oportunidades_salvas
 from alerts import tela_alertas
-from professionals import tela_profissionais, buscar_profissionais
+from professionals import tela_profissionais, buscar_profissionais, tela_meu_perfil
 from admin import tela_admin_profissionais
 
 
@@ -126,6 +126,7 @@ with st.sidebar:
         "Radar de Oportunidades",
         "Base Inteligente",
         "Meus Alertas",
+        "Meu Perfil",
         "Marketplace Profissional"
     ]
 
@@ -417,8 +418,11 @@ elif pagina == "Base Inteligente":
 elif pagina == "Meus Alertas":
     tela_alertas(user_email)
 
+elif pagina == "Meu Perfil":
+    tela_meu_perfil(user_email)
+
 elif pagina == "Marketplace Profissional":
-    tela_profissionais()
+    tela_profissionais(user_email)
 
 elif pagina == "Painel Admin":
     if user_email in ADMIN_EMAILS:
