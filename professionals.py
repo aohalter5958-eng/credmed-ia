@@ -3,7 +3,10 @@ import streamlit as st
 from database import supabase, upload_curriculo_pdf
 
 
-def salvar_profissional(dados):
+def salvar_profissional(dados, user_email=None):
+    if user_email:
+        dados["user_email"] = user_email
+
     supabase.table("profissionais").insert(dados).execute()
 
 
@@ -35,10 +38,7 @@ def buscar_meu_perfil(user_email):
         .execute()
     )
 
-    if response.data:
-        return response.data[0]
-
-    return None
+    return response.data[0] if response.data else None
 
 
 def limpar_telefone(telefone):
@@ -361,7 +361,10 @@ def tela_meu_perfil(user_email):
                 )
 
             else:
-                salvar_profissional(dados)
+                salvar_profissional(
+                    dados,
+                    user_email
+                )
 
                 st.success(
                     "✅ Perfil criado com sucesso! "
