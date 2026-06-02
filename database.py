@@ -112,15 +112,14 @@ def upload_curriculo_pdf(arquivo, nome_profissional):
         )
 
         timestamp = int(time.time())
-
         caminho_arquivo = f"{nome_limpo}_{timestamp}.pdf"
 
         conteudo = arquivo.getvalue()
 
         supabase.storage.from_("curriculos").upload(
-            caminho_arquivo,
-            conteudo,
-            {
+            path=caminho_arquivo,
+            file=conteudo,
+            file_options={
                 "content-type": "application/pdf",
                 "upsert": "true"
             }
@@ -133,6 +132,7 @@ def upload_curriculo_pdf(arquivo, nome_profissional):
         return url_publica
 
     except Exception as erro:
+        st.error(f"Erro ao fazer upload do currículo: {erro}")
         print("Erro ao fazer upload do currículo:")
         print(erro)
         return None
