@@ -23,7 +23,6 @@ def buscar_profissionais():
         .order("created_at", desc=True)
         .execute()
     )
-
     return response.data if response.data else []
 
 
@@ -37,7 +36,30 @@ def buscar_meu_perfil(user_email):
         .limit(1)
         .execute()
     )
+    return response.data[0] if response.data else None
 
+
+def salvar_empresa(dados, user_email=None):
+    if user_email:
+        dados["user_email"] = user_email
+
+    supabase.table("empresas").insert(dados).execute()
+
+
+def atualizar_empresa(empresa_id, dados):
+    supabase.table("empresas").update(dados).eq("id", empresa_id).execute()
+
+
+def buscar_meu_perfil_empresa(user_email):
+    response = (
+        supabase
+        .table("empresas")
+        .select("*")
+        .eq("user_email", user_email)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
     return response.data[0] if response.data else None
 
 
@@ -92,9 +114,7 @@ def card_profissional(item):
             margin-bottom:20px;
             border:1px solid rgba(255,255,255,0.08);
         ">
-
         <h2 style="color:white;">👨‍⚕️ {nome}</h2>
-
         <p><b>Status:</b> ✅ Profissional verificado</p>
         <p><b>Profissão:</b> {item.get("profissao", "-")}</p>
         <p><b>Especialidade:</b> {item.get("especialidade", "-")}</p>
@@ -110,57 +130,34 @@ def card_profissional(item):
         <p><b>Currículo resumido:</b> {item.get("curriculo", "-")}</p>
         <p><b>Telefone:</b> {telefone}</p>
         <p><b>Email:</b> {email}</p>
-
         </div>
         """,
         unsafe_allow_html=True
     )
 
     if curriculo_pdf:
-        st.link_button(
-            "📄 Baixar currículo PDF",
-            curriculo_pdf,
-            use_container_width=True
-        )
+        st.link_button("📄 Baixar currículo PDF", curriculo_pdf, use_container_width=True)
 
     if telefone:
-        st.link_button(
-            "📱 Chamar no WhatsApp",
-            gerar_link_whatsapp(telefone, nome),
-            use_container_width=True
-        )
+        st.link_button("📱 Chamar no WhatsApp", gerar_link_whatsapp(telefone, nome), use_container_width=True)
 
     if email:
-        st.link_button(
-            "📧 Enviar Email",
-            gerar_link_email(email, nome),
-            use_container_width=True
-        )
+        st.link_button("📧 Enviar Email", gerar_link_email(email, nome), use_container_width=True)
 
 
 def formulario_profissional(dados_existentes=None):
     if dados_existentes is None:
         dados_existentes = {}
 
-    nome = st.text_input(
-        "Nome completo",
-        value=dados_existentes.get("nome", "")
-    )
+    nome = st.text_input("Nome completo", value=dados_existentes.get("nome", ""))
 
     opcoes_profissao = [
-        "Médico",
-        "Enfermeiro",
-        "Fisioterapeuta",
-        "Psicólogo",
-        "Farmacêutico",
-        "Biomédico",
-        "Dentista",
-        "Técnico de Enfermagem",
-        "Outro"
+        "Médico", "Enfermeiro", "Fisioterapeuta", "Psicólogo",
+        "Farmacêutico", "Biomédico", "Dentista",
+        "Técnico de Enfermagem", "Outro"
     ]
 
     profissao_atual = dados_existentes.get("profissao", "Enfermeiro")
-
     if profissao_atual not in opcoes_profissao:
         profissao_atual = "Outro"
 
@@ -170,55 +167,16 @@ def formulario_profissional(dados_existentes=None):
         index=opcoes_profissao.index(profissao_atual)
     )
 
-    especialidade = st.text_input(
-        "Especialidade",
-        value=dados_existentes.get("especialidade", "")
-    )
+    especialidade = st.text_input("Especialidade", value=dados_existentes.get("especialidade", ""))
+    conselho = st.text_input("Conselho profissional (CRM, COREN, etc)", value=dados_existentes.get("conselho", ""))
+    numero_registro = st.text_input("Número do registro profissional", value=dados_existentes.get("numero_registro", ""))
+    estado = st.text_input("Estado", value=dados_existentes.get("estado", ""))
+    cidade = st.text_input("Cidade", value=dados_existentes.get("cidade", ""))
+    telefone = st.text_input("Telefone/WhatsApp", value=dados_existentes.get("telefone", ""), placeholder="Ex: 44999999999")
+    email = st.text_input("Email", value=dados_existentes.get("email", ""))
 
-    conselho = st.text_input(
-        "Conselho profissional (CRM, COREN, etc)",
-        value=dados_existentes.get("conselho", "")
-    )
-
-    numero_registro = st.text_input(
-        "Número do registro profissional",
-        value=dados_existentes.get("numero_registro", "")
-    )
-
-    estado = st.text_input(
-        "Estado",
-        value=dados_existentes.get("estado", "")
-    )
-
-    cidade = st.text_input(
-        "Cidade",
-        value=dados_existentes.get("cidade", "")
-    )
-
-    telefone = st.text_input(
-        "Telefone/WhatsApp",
-        value=dados_existentes.get("telefone", ""),
-        placeholder="Ex: 44999999999"
-    )
-
-    email = st.text_input(
-        "Email",
-        value=dados_existentes.get("email", "")
-    )
-
-    opcoes_disponibilidade = [
-        "Imediata",
-        "Plantões",
-        "PJ",
-        "CLT",
-        "Parcial"
-    ]
-
-    disponibilidade_atual = dados_existentes.get(
-        "disponibilidade",
-        "Imediata"
-    )
-
+    opcoes_disponibilidade = ["Imediata", "Plantões", "PJ", "CLT", "Parcial"]
+    disponibilidade_atual = dados_existentes.get("disponibilidade", "Imediata")
     if disponibilidade_atual not in opcoes_disponibilidade:
         disponibilidade_atual = "Imediata"
 
@@ -228,30 +186,11 @@ def formulario_profissional(dados_existentes=None):
         index=opcoes_disponibilidade.index(disponibilidade_atual)
     )
 
-    tipos_contrato = st.text_input(
-        "Tipos de contrato",
-        value=dados_existentes.get("tipos_contrato", "")
-    )
-
-    valor_plantao = st.text_input(
-        "Valor médio do plantão",
-        value=dados_existentes.get("valor_plantao", "")
-    )
-
-    experiencia = st.text_area(
-        "Experiência profissional",
-        value=dados_existentes.get("experiencia", "")
-    )
-
-    palavras_chave = st.text_input(
-        "Palavras-chave",
-        value=dados_existentes.get("palavras_chave", "")
-    )
-
-    curriculo = st.text_area(
-        "Resumo do currículo",
-        value=dados_existentes.get("curriculo", "")
-    )
+    tipos_contrato = st.text_input("Tipos de contrato", value=dados_existentes.get("tipos_contrato", ""))
+    valor_plantao = st.text_input("Valor médio do plantão", value=dados_existentes.get("valor_plantao", ""))
+    experiencia = st.text_area("Experiência profissional", value=dados_existentes.get("experiencia", ""))
+    palavras_chave = st.text_input("Palavras-chave", value=dados_existentes.get("palavras_chave", ""))
+    curriculo = st.text_area("Resumo do currículo", value=dados_existentes.get("curriculo", ""))
 
     arquivo_curriculo = st.file_uploader(
         "Anexar/Atualizar currículo em PDF",
@@ -303,23 +242,16 @@ def tela_meu_perfil(user_email):
         curriculo_pdf = perfil.get("curriculo_pdf")
 
         if curriculo_pdf:
-            st.link_button(
-                "📄 Ver currículo PDF atual",
-                curriculo_pdf,
-                use_container_width=True
-            )
+            st.link_button("📄 Ver currículo PDF atual", curriculo_pdf, use_container_width=True)
 
     else:
         st.info("Você ainda não possui perfil profissional cadastrado.")
 
     with st.form("form_meu_perfil"):
-
         dados_form = formulario_profissional(perfil)
-
         salvar = st.form_submit_button("💾 Salvar meu perfil")
 
         if salvar:
-
             curriculo_pdf_url = perfil.get("curriculo_pdf") if perfil else None
 
             if dados_form["arquivo_curriculo"] is not None:
@@ -346,30 +278,163 @@ def tela_meu_perfil(user_email):
                 "palavras_chave": dados_form["palavras_chave"],
                 "curriculo": dados_form["curriculo"],
                 "curriculo_pdf": curriculo_pdf_url,
-                "status_verificacao": "pendente"
+                "status_verificacao": "pendente",
+                "tipo_usuario": "profissional"
             }
 
             if perfil:
-                atualizar_profissional(
-                    perfil.get("id"),
-                    dados
-                )
-
-                st.success(
-                    "✅ Perfil atualizado com sucesso! "
-                    "Ele voltou para análise administrativa."
-                )
-
+                atualizar_profissional(perfil.get("id"), dados)
+                st.success("✅ Perfil atualizado com sucesso! Ele voltou para análise administrativa.")
             else:
-                salvar_profissional(
-                    dados,
-                    user_email
-                )
+                salvar_profissional(dados, user_email)
+                st.success("✅ Perfil criado com sucesso! Ele ficará pendente até validação administrativa.")
 
-                st.success(
-                    "✅ Perfil criado com sucesso! "
-                    "Ele ficará pendente até validação administrativa."
-                )
+            st.rerun()
+
+
+def formulario_empresa(dados_existentes=None):
+    if dados_existentes is None:
+        dados_existentes = {}
+
+    razao_social = st.text_input(
+        "Razão Social",
+        value=dados_existentes.get("razao_social", "")
+    )
+
+    nome_fantasia = st.text_input(
+        "Nome Fantasia",
+        value=dados_existentes.get("nome_fantasia", "")
+    )
+
+    nome_empresa = st.text_input(
+        "Nome da empresa para exibição",
+        value=dados_existentes.get("nome_empresa", "")
+    )
+
+    cnpj = st.text_input(
+        "CNPJ",
+        value=dados_existentes.get("cnpj", "")
+    )
+
+    responsavel = st.text_input(
+        "Responsável",
+        value=dados_existentes.get("responsavel", "")
+    )
+
+    telefone = st.text_input(
+        "Telefone/WhatsApp",
+        value=dados_existentes.get("telefone", ""),
+        placeholder="Ex: 44999999999"
+    )
+
+    email = st.text_input(
+        "E-mail empresarial",
+        value=dados_existentes.get("email", "")
+    )
+
+    estado = st.text_input(
+        "Estado",
+        value=dados_existentes.get("estado", "")
+    )
+
+    cidade = st.text_input(
+        "Cidade",
+        value=dados_existentes.get("cidade", "")
+    )
+
+    site = st.text_input(
+        "Site ou rede social",
+        value=dados_existentes.get("site", "")
+    )
+
+    especialidades_procuradas = st.text_area(
+        "Especialidades/profissionais que a empresa costuma procurar",
+        value=dados_existentes.get("especialidades_procuradas", ""),
+        placeholder="Ex: médicos clínicos, enfermeiros, técnicos de enfermagem, psicólogos..."
+    )
+
+    quantidade_profissionais = st.text_input(
+        "Quantidade aproximada de profissionais que costuma contratar",
+        value=dados_existentes.get("quantidade_profissionais", "")
+    )
+
+    descricao = st.text_area(
+        "Descrição da empresa",
+        value=dados_existentes.get("descricao", ""),
+        placeholder="Descreva a atuação da empresa, regiões atendidas, tipos de serviços e demandas."
+    )
+
+    return {
+        "razao_social": razao_social,
+        "nome_fantasia": nome_fantasia,
+        "nome_empresa": nome_empresa,
+        "cnpj": cnpj,
+        "responsavel": responsavel,
+        "telefone": telefone,
+        "email": email,
+        "estado": estado,
+        "cidade": cidade,
+        "site": site,
+        "especialidades_procuradas": especialidades_procuradas,
+        "quantidade_profissionais": quantidade_profissionais,
+        "descricao": descricao
+    }
+
+
+def tela_meu_perfil_empresa(user_email):
+    st.title("🏢 Meu Perfil Empresa")
+
+    st.write(
+        "Cadastre ou atualize o perfil empresarial. "
+        "Toda alteração poderá voltar para análise administrativa."
+    )
+
+    empresa = buscar_meu_perfil_empresa(user_email)
+
+    if empresa:
+        status = empresa.get("status_verificacao", "pendente")
+
+        if status == "verificado":
+            st.success("✅ Sua empresa está verificada.")
+        elif status == "pendente":
+            st.warning("🟡 Sua empresa está aguardando verificação administrativa.")
+        elif status == "recusado":
+            st.error("🔴 Sua empresa foi recusada. Atualize as informações e envie novamente.")
+        else:
+            st.info(f"Status atual: {status}")
+    else:
+        st.info("Você ainda não possui perfil empresarial cadastrado.")
+
+    with st.form("form_meu_perfil_empresa"):
+        dados_form = formulario_empresa(empresa)
+        salvar = st.form_submit_button("💾 Salvar perfil empresa")
+
+        if salvar:
+            dados = {
+                "user_email": user_email,
+                "tipo_usuario": "empresa",
+                "razao_social": dados_form["razao_social"],
+                "nome_fantasia": dados_form["nome_fantasia"],
+                "nome_empresa": dados_form["nome_empresa"],
+                "cnpj": dados_form["cnpj"],
+                "responsavel": dados_form["responsavel"],
+                "telefone": dados_form["telefone"],
+                "email": dados_form["email"],
+                "estado": dados_form["estado"],
+                "cidade": dados_form["cidade"],
+                "site": dados_form["site"],
+                "especialidades_procuradas": dados_form["especialidades_procuradas"],
+                "quantidade_profissionais": dados_form["quantidade_profissionais"],
+                "descricao": dados_form["descricao"],
+                "status_verificacao": "pendente"
+            }
+
+            if empresa:
+                atualizar_empresa(empresa.get("id"), dados)
+                st.success("✅ Perfil empresarial atualizado com sucesso! Ele voltou para análise administrativa.")
+            else:
+                salvar_empresa(dados, user_email)
+                st.success("✅ Perfil empresarial criado com sucesso! Ele ficará pendente até validação administrativa.")
 
             st.rerun()
 
