@@ -26,14 +26,20 @@ def salvar_analise(nome_arquivo, resultado, user_email):
 
 
 def buscar_historico(user_email):
-    response = (
-        supabase.table("analyses")
-        .select("*")
-        .eq("user_email", user_email)
-        .order("id", desc=True)
-        .execute()
-    )
-    return response.data if response.data else []
+    try:
+        response = (
+            supabase.table("analyses")
+            .select("*")
+            .eq("user_email", user_email)
+            .order("id", desc=True)
+            .execute()
+        )
+        return response.data if response.data else []
+
+    except Exception as erro:
+        print("Erro ao buscar histórico:")
+        print(erro)
+        return []
 
 
 def gerar_hash_oportunidade(item):
