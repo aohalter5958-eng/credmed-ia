@@ -4,63 +4,113 @@ from database import supabase, upload_curriculo_pdf
 
 
 def salvar_profissional(dados, user_email=None):
-    if user_email:
-        dados["user_email"] = user_email
+    try:
+        if user_email:
+            dados["user_email"] = user_email
 
-    supabase.table("profissionais").insert(dados).execute()
+        supabase.table("profissionais").insert(dados).execute()
+        return True
+
+    except Exception as erro:
+        st.error(f"Erro ao salvar profissional: {erro}")
+        print("Erro ao salvar profissional:")
+        print(erro)
+        return False
 
 
 def atualizar_profissional(profissional_id, dados):
-    supabase.table("profissionais").update(dados).eq("id", profissional_id).execute()
+    try:
+        supabase.table("profissionais").update(dados).eq("id", profissional_id).execute()
+        return True
+
+    except Exception as erro:
+        st.error(f"Erro ao atualizar profissional: {erro}")
+        print("Erro ao atualizar profissional:")
+        print(erro)
+        return False
 
 
 def buscar_profissionais():
-    response = (
-        supabase
-        .table("profissionais")
-        .select("*")
-        .eq("status_verificacao", "verificado")
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return response.data if response.data else []
+    try:
+        response = (
+            supabase
+            .table("profissionais")
+            .select("*")
+            .eq("status_verificacao", "verificado")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return response.data if response.data else []
+
+    except Exception as erro:
+        print("Erro ao buscar profissionais:")
+        print(erro)
+        return []
 
 
 def buscar_meu_perfil(user_email):
-    response = (
-        supabase
-        .table("profissionais")
-        .select("*")
-        .eq("user_email", user_email)
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-    )
-    return response.data[0] if response.data else None
+    try:
+        response = (
+            supabase
+            .table("profissionais")
+            .select("*")
+            .eq("user_email", user_email)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return response.data[0] if response.data else None
+
+    except Exception as erro:
+        print("Erro ao buscar meu perfil profissional:")
+        print(erro)
+        return None
 
 
 def salvar_empresa(dados, user_email=None):
-    if user_email:
-        dados["user_email"] = user_email
+    try:
+        if user_email:
+            dados["user_email"] = user_email
 
-    supabase.table("empresas").insert(dados).execute()
+        supabase.table("empresas").insert(dados).execute()
+        return True
+
+    except Exception as erro:
+        st.error(f"Erro ao salvar empresa: {erro}")
+        print("Erro ao salvar empresa:")
+        print(erro)
+        return False
 
 
 def atualizar_empresa(empresa_id, dados):
-    supabase.table("empresas").update(dados).eq("id", empresa_id).execute()
+    try:
+        supabase.table("empresas").update(dados).eq("id", empresa_id).execute()
+        return True
+
+    except Exception as erro:
+        st.error(f"Erro ao atualizar empresa: {erro}")
+        print("Erro ao atualizar empresa:")
+        print(erro)
+        return False
 
 
 def buscar_meu_perfil_empresa(user_email):
-    response = (
-        supabase
-        .table("empresas")
-        .select("*")
-        .eq("user_email", user_email)
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-    )
-    return response.data[0] if response.data else None
+    try:
+        response = (
+            supabase
+            .table("empresas")
+            .select("*")
+            .eq("user_email", user_email)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return response.data[0] if response.data else None
+
+    except Exception as erro:
+        print("Erro ao buscar perfil empresa:")
+        print(erro)
+        return None
 
 
 def limpar_telefone(telefone):
@@ -243,7 +293,6 @@ def tela_meu_perfil(user_email):
 
         if curriculo_pdf:
             st.link_button("📄 Ver currículo PDF atual", curriculo_pdf, use_container_width=True)
-
     else:
         st.info("Você ainda não possui perfil profissional cadastrado.")
 
@@ -283,69 +332,31 @@ def tela_meu_perfil(user_email):
             }
 
             if perfil:
-                atualizar_profissional(perfil.get("id"), dados)
-                st.success("✅ Perfil atualizado com sucesso! Ele voltou para análise administrativa.")
+                sucesso = atualizar_profissional(perfil.get("id"), dados)
+                if sucesso:
+                    st.success("✅ Perfil atualizado com sucesso! Ele voltou para análise administrativa.")
+                    st.rerun()
             else:
-                salvar_profissional(dados, user_email)
-                st.success("✅ Perfil criado com sucesso! Ele ficará pendente até validação administrativa.")
-
-            st.rerun()
+                sucesso = salvar_profissional(dados, user_email)
+                if sucesso:
+                    st.success("✅ Perfil criado com sucesso! Ele ficará pendente até validação administrativa.")
+                    st.rerun()
 
 
 def formulario_empresa(dados_existentes=None):
     if dados_existentes is None:
         dados_existentes = {}
 
-    razao_social = st.text_input(
-        "Razão Social",
-        value=dados_existentes.get("razao_social", "")
-    )
-
-    nome_fantasia = st.text_input(
-        "Nome Fantasia",
-        value=dados_existentes.get("nome_fantasia", "")
-    )
-
-    nome_empresa = st.text_input(
-        "Nome da empresa para exibição",
-        value=dados_existentes.get("nome_empresa", "")
-    )
-
-    cnpj = st.text_input(
-        "CNPJ",
-        value=dados_existentes.get("cnpj", "")
-    )
-
-    responsavel = st.text_input(
-        "Responsável",
-        value=dados_existentes.get("responsavel", "")
-    )
-
-    telefone = st.text_input(
-        "Telefone/WhatsApp",
-        value=dados_existentes.get("telefone", ""),
-        placeholder="Ex: 44999999999"
-    )
-
-    email = st.text_input(
-        "E-mail empresarial",
-        value=dados_existentes.get("email", "")
-    )
-
-    estado = st.text_input(
-        "Estado",
-        value=dados_existentes.get("estado", "")
-    )
-
-    cidade = st.text_input(
-        "Cidade",
-        value=dados_existentes.get("cidade", "")
-    )
-
-    site = st.text_input(
-        "Site ou rede social",
-        value=dados_existentes.get("site", "")
-    )
+    razao_social = st.text_input("Razão Social", value=dados_existentes.get("razao_social", ""))
+    nome_fantasia = st.text_input("Nome Fantasia", value=dados_existentes.get("nome_fantasia", ""))
+    nome_empresa = st.text_input("Nome da empresa para exibição", value=dados_existentes.get("nome_empresa", ""))
+    cnpj = st.text_input("CNPJ", value=dados_existentes.get("cnpj", ""))
+    responsavel = st.text_input("Responsável", value=dados_existentes.get("responsavel", ""))
+    telefone = st.text_input("Telefone/WhatsApp", value=dados_existentes.get("telefone", ""), placeholder="Ex: 44999999999")
+    email = st.text_input("E-mail empresarial", value=dados_existentes.get("email", ""))
+    estado = st.text_input("Estado", value=dados_existentes.get("estado", ""))
+    cidade = st.text_input("Cidade", value=dados_existentes.get("cidade", ""))
+    site = st.text_input("Site ou rede social", value=dados_existentes.get("site", ""))
 
     especialidades_procuradas = st.text_area(
         "Especialidades/profissionais que a empresa costuma procurar",
@@ -430,13 +441,15 @@ def tela_meu_perfil_empresa(user_email):
             }
 
             if empresa:
-                atualizar_empresa(empresa.get("id"), dados)
-                st.success("✅ Perfil empresarial atualizado com sucesso! Ele voltou para análise administrativa.")
+                sucesso = atualizar_empresa(empresa.get("id"), dados)
+                if sucesso:
+                    st.success("✅ Perfil empresarial atualizado com sucesso! Ele voltou para análise administrativa.")
+                    st.rerun()
             else:
-                salvar_empresa(dados, user_email)
-                st.success("✅ Perfil empresarial criado com sucesso! Ele ficará pendente até validação administrativa.")
-
-            st.rerun()
+                sucesso = salvar_empresa(dados, user_email)
+                if sucesso:
+                    st.success("✅ Perfil empresarial criado com sucesso! Ele ficará pendente até validação administrativa.")
+                    st.rerun()
 
 
 def tela_profissionais(user_email=None):
