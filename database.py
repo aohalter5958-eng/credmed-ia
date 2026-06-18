@@ -14,15 +14,20 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 def salvar_analise(nome_arquivo, resultado, user_email):
-    return (
-        supabase.table("analyses")
-        .insert({
-            "nome_arquivo": nome_arquivo,
-            "resultado": resultado,
-            "user_email": user_email
-        })
-        .execute()
-    )
+    try:
+        return (
+            supabase.table("analyses")
+            .insert({
+                "nome_arquivo": nome_arquivo,
+                "resultado": resultado,
+                "user_email": user_email
+            })
+            .execute()
+        )
+    except Exception as erro:
+        print("Erro ao salvar análise:")
+        print(erro)
+        return None
 
 
 def buscar_historico(user_email):
@@ -94,14 +99,20 @@ def salvar_oportunidade(item):
 
 
 def buscar_oportunidades():
-    response = (
-        supabase.table("opportunities")
-        .select("*")
-        .order("id", desc=True)
-        .limit(200)
-        .execute()
-    )
-    return response.data if response.data else []
+    try:
+        response = (
+            supabase.table("opportunities")
+            .select("*")
+            .order("id", desc=True)
+            .limit(200)
+            .execute()
+        )
+        return response.data if response.data else []
+
+    except Exception as erro:
+        print("Erro ao buscar oportunidades:")
+        print(erro)
+        return []
 
 
 def upload_curriculo_pdf(arquivo, nome_profissional):
@@ -119,7 +130,6 @@ def upload_curriculo_pdf(arquivo, nome_profissional):
 
         timestamp = int(time.time())
         caminho_arquivo = f"{nome_limpo}_{timestamp}.pdf"
-
         conteudo = arquivo.getvalue()
 
         supabase.storage.from_("curriculos").upload(
@@ -131,11 +141,7 @@ def upload_curriculo_pdf(arquivo, nome_profissional):
             }
         )
 
-        url_publica = supabase.storage.from_("curriculos").get_public_url(
-            caminho_arquivo
-        )
-
-        return url_publica
+        return supabase.storage.from_("curriculos").get_public_url(caminho_arquivo)
 
     except Exception as erro:
         st.error(f"Erro ao fazer upload do currículo: {erro}")
