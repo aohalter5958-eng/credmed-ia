@@ -4,45 +4,73 @@ from database import supabase
 
 
 def buscar_profissionais_pendentes():
-    response = (
-        supabase
-        .table("profissionais")
-        .select("*")
-        .eq("status_verificacao", "pendente")
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return response.data if response.data else []
+    try:
+        response = (
+            supabase
+            .table("profissionais")
+            .select("*")
+            .eq("status_verificacao", "pendente")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return response.data if response.data else []
+
+    except Exception as erro:
+        print("Erro ao buscar profissionais pendentes:")
+        print(erro)
+        return []
 
 
 def buscar_empresas_pendentes():
-    response = (
-        supabase
-        .table("empresas")
-        .select("*")
-        .eq("status_verificacao", "pendente")
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return response.data if response.data else []
+    try:
+        response = (
+            supabase
+            .table("empresas")
+            .select("*")
+            .eq("status_verificacao", "pendente")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return response.data if response.data else []
+
+    except Exception as erro:
+        print("Erro ao buscar empresas pendentes:")
+        print(erro)
+        return []
 
 
 def atualizar_status_profissional(profissional_id, status, observacao, admin_email):
-    supabase.table("profissionais").update({
-        "status_verificacao": status,
-        "observacao_verificacao": observacao,
-        "verificado_em": datetime.now().isoformat(),
-        "verificado_por": admin_email
-    }).eq("id", profissional_id).execute()
+    try:
+        supabase.table("profissionais").update({
+            "status_verificacao": status,
+            "observacao_verificacao": observacao,
+            "verificado_em": datetime.now().isoformat(),
+            "verificado_por": admin_email
+        }).eq("id", profissional_id).execute()
+        return True
+
+    except Exception as erro:
+        st.error(f"Erro ao atualizar profissional: {erro}")
+        print("Erro ao atualizar profissional:")
+        print(erro)
+        return False
 
 
 def atualizar_status_empresa(empresa_id, status, observacao, admin_email):
-    supabase.table("empresas").update({
-        "status_verificacao": status,
-        "observacao_verificacao": observacao,
-        "verificado_em": datetime.now().isoformat(),
-        "verificado_por": admin_email
-    }).eq("id", empresa_id).execute()
+    try:
+        supabase.table("empresas").update({
+            "status_verificacao": status,
+            "observacao_verificacao": observacao,
+            "verificado_em": datetime.now().isoformat(),
+            "verificado_por": admin_email
+        }).eq("id", empresa_id).execute()
+        return True
+
+    except Exception as erro:
+        st.error(f"Erro ao atualizar empresa: {erro}")
+        print("Erro ao atualizar empresa:")
+        print(erro)
+        return False
 
 
 def tela_admin_profissionais(admin_email):
@@ -97,28 +125,32 @@ def tela_admin_profissionais(admin_email):
                             "✅ Aprovar profissional",
                             key=f"aprovar_prof_{item.get('id')}"
                         ):
-                            atualizar_status_profissional(
+                            sucesso = atualizar_status_profissional(
                                 item.get("id"),
                                 "verificado",
                                 observacao,
                                 admin_email
                             )
-                            st.success("Profissional aprovado.")
-                            st.rerun()
+
+                            if sucesso:
+                                st.success("Profissional aprovado.")
+                                st.rerun()
 
                     with col2:
                         if st.button(
                             "❌ Recusar profissional",
                             key=f"recusar_prof_{item.get('id')}"
                         ):
-                            atualizar_status_profissional(
+                            sucesso = atualizar_status_profissional(
                                 item.get("id"),
                                 "recusado",
                                 observacao,
                                 admin_email
                             )
-                            st.warning("Profissional recusado.")
-                            st.rerun()
+
+                            if sucesso:
+                                st.warning("Profissional recusado.")
+                                st.rerun()
 
     with aba2:
         st.subheader("Verificação de Empresas")
@@ -172,25 +204,29 @@ def tela_admin_profissionais(admin_email):
                             "✅ Aprovar empresa",
                             key=f"aprovar_emp_{item.get('id')}"
                         ):
-                            atualizar_status_empresa(
+                            sucesso = atualizar_status_empresa(
                                 item.get("id"),
                                 "verificado",
                                 observacao,
                                 admin_email
                             )
-                            st.success("Empresa aprovada.")
-                            st.rerun()
+
+                            if sucesso:
+                                st.success("Empresa aprovada.")
+                                st.rerun()
 
                     with col2:
                         if st.button(
                             "❌ Recusar empresa",
                             key=f"recusar_emp_{item.get('id')}"
                         ):
-                            atualizar_status_empresa(
+                            sucesso = atualizar_status_empresa(
                                 item.get("id"),
                                 "recusado",
                                 observacao,
                                 admin_email
                             )
-                            st.warning("Empresa recusada.")
-                            st.rerun()
+
+                            if sucesso:
+                                st.warning("Empresa recusada.")
+                                st.rerun()
